@@ -1175,3 +1175,162 @@ legend {
     scroll-behavior: auto !important;
   }
 }
+
+/* Branch identity is independent of publication state. */
+:root {
+  --st-fill: #293d2e;
+  --st-ink: #c5e7b7;
+  --st-line: #647f5b;
+  --csw-fill: #443123;
+  --csw-ink: #f1c69b;
+  --csw-line: #a17a53;
+  --soho-fill: #382e46;
+  --soho-ink: #ddc9ee;
+  --soho-line: #8e74a5;
+}
+[data-branch="st"] {
+  --branch-fill: var(--st-fill);
+  --branch-ink: var(--st-ink);
+  --branch-line: var(--st-line);
+}
+[data-branch="csw"] {
+  --branch-fill: var(--csw-fill);
+  --branch-ink: var(--csw-ink);
+  --branch-line: var(--csw-line);
+}
+[data-branch="soho"] {
+  --branch-fill: var(--soho-fill);
+  --branch-ink: var(--soho-ink);
+  --branch-line: var(--soho-line);
+}
+.shift[data-branch],
+.shift.draft[data-branch] {
+  background: var(--branch-fill);
+  color: var(--branch-ink);
+  border-color: var(--branch-line);
+}
+.shift.draft[data-branch] {
+  border-style: dashed;
+  border-width: 2px;
+}
+.branch-card[data-branch] {
+  border-top: 3px solid var(--branch-line);
+}
+.branch-card[data-branch] h2,
+.branch-card[data-branch] strong {
+  color: var(--branch-ink);
+}
+.branch-card.chosen[data-branch] {
+  background: var(--branch-fill);
+  border-color: var(--branch-line);
+}
+.branch-badge {
+  display: inline-flex;
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: var(--branch-fill);
+  color: var(--branch-ink);
+  border: 1px solid var(--branch-line);
+}
+.branch-badges {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.checkbox-label[data-branch] {
+  color: var(--branch-ink);
+}
+.checkbox-label[data-branch] input {
+  accent-color: var(--branch-ink);
+}
+select[data-branch] {
+  border-color: var(--branch-line);
+  color: var(--branch-ink);
+}
+.person div > .employee-hours {
+  display: inline-block;
+  color: var(--text);
+  font-size: 11px;
+  margin: 2px 0 0 5px;
+  font-variant-numeric: tabular-nums;
+}
+.employee-hours small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+}
+.inbox-filters {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.inbox-filters label {
+  display: flex;
+  flex: 1;
+  min-width: 130px;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.inbox-filters select,
+.inbox-filters input {
+  width: 100%;
+  min-height: 44px;
+}
+.request-content {
+  min-width: 0;
+  flex: 1;
+}
+.request-actions {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+}
+.request-actions button {
+  min-height: 44px;
+}
+.schedule-status {
+  display: block;
+  font-size: 11px;
+  color: var(--text);
+  margin: 4px 0;
+}
+.submission-summary {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 14px 0;
+  font-size: 12px;
+}
+.submission-summary p {
+  color: var(--muted);
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .person div > .employee-hours {
+    display: block;
+    margin: 4px 0;
+    font-size: 11px;
+  }
+  .rota-footer > span {
+    line-height: 1.7;
+  }
+  .request {
+    gap: 6px;
+  }
+  .request-actions button {
+    padding: 7px 4px;
+  }
+  .branch-checks .checkbox-label {
+    min-height: 44px;
+  }
+  .date-chips button {
+    min-height: 44px;
+  }
+}

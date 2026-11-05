@@ -22,10 +22,18 @@ import {
   employees,
   makeSeed,
   Shift,
-  validateAvailability,
+  branchTone,
+  employeeHours,
+  formatHours,
+  shiftHours,
+  filterShifts,
+  availabilityWarning,
+  validateAvailabilitySubmission,
   validateShift,
 } from "@/lib/scheduling";
 import { localScheduleRepository } from "@/lib/storage";
+
+import AvailabilityInbox from "./availability-inbox";
 
 type Editor = "shift" | "availability" | null;
 const blankShift = (date: string): Shift => ({
@@ -127,26 +135,22 @@ export default function Home() {
     (_, i) => new Date(month.getFullYear(), month.getMonth(), i + 1),
   );
   const prefix = dateKey(month).slice(0, 7);
-  const monthShifts = data.shifts.filter(
-    (s) => s.date.startsWith(prefix) && (manager || s.status === "published"),
-  );
-  const visible = monthShifts.filter(
-    (s) => branch === "All" || s.branch === branch,
-  );
+  const monthShifts = filterShifts(data.shifts, prefix, "All", manager);
+  const visible = filterShifts(data.shifts, prefix, branch, manager);
   const visibleAvailability = data.availability.filter(
     (a) =>
       (manager || a.employeeId === employee) &&
       (branch === "All" || a.branches.includes(branch)),
   );
-  const hours = visible.reduce(
-    (sum, s) =>
-      sum +
-      (+s.end.slice(0, 2) * 60 +
-        +s.end.slice(3) -
-        (+s.start.slice(0, 2) * 60 + +s.start.slice(3))) /
-        60,
-    0,
-  );
+  const hours = visible.reduce((n, s) => n + shiftHours(s), 0);
+  const editAvailability = (a: Availability) => {
+    if (!manager && a.employeeId !== employee) return;
+    trigger.current = document.activeElement as HTMLElement;
+    setAvailability({ ...a, dates: [...a.dates], branches: [...a.branches] });
+    setDate(a.dates[0]);
+    setError("");
+    setEditor("availability");
+  };
   const drafts = visible.filter((s) => s.status === "draft");
   const monthTitle = month.toLocaleDateString("en-GB", {
     month: "long",
@@ -287,6 +291,7 @@ export default function Home() {
               return (
                 <button
                   key={b}
+                  data-branch={branchTone[b]}
                   className={`branch-card ${branch === b ? "chosen" : ""}`}
                   onClick={() => setBranch(branch === b ? "All" : b)}
                   aria-pressed={branch === b}
@@ -380,6 +385,9 @@ export default function Home() {
                 Branch
                 <select
                   aria-label="Branch"
+                  data-branch={
+                    branch !== "All" ? branchTone[branch] : undefined
+                  }
                   id="branch-filter"
                   value={branch}
                   onChange={(e) => setBranch(e.target.value as Branch | "All")}
@@ -396,7 +404,8 @@ export default function Home() {
                 <strong>{visible.length}</strong> shifts
               </span>
               <span>
-                <strong>{hours}</strong> scheduled hours
+                <strong>{formatHours(hours)}</strong> scheduled hours{" "}
+                {manager && "(incl. drafts)"}
               </span>
               <span>
                 <strong>{availableCount}</strong> available days
@@ -465,6 +474,23 @@ export default function Home() {
                           </span>
                           <div>
                             {e.name}
+                            <span className="employee-hours">
+                              {formatHours(
+                                employeeHours(visible, e.id).published,
+                              )}
+                              h
+                              {manager &&
+                                employeeHours(visible, e.id).draft > 0 && (
+                                  <small>
+                                    {" "}
+                                    +
+                                    {formatHours(
+                                      employeeHours(visible, e.id).draft,
+                                    )}
+                                    h draft
+                                  </small>
+                                )}
+                            </span>
                             <span>{e.role}</span>
                           </div>
                         </div>
@@ -486,6 +512,7 @@ export default function Home() {
                               manager ? (
                                 <button
                                   key={s.id}
+                                  data-branch={branchTone[s.branch]}
                                   className={`shift ${s.status}`}
                                   onClick={() => open("shift", s)}
                                   aria-label={`Edit ${e.name}, ${s.date}, ${s.start} to ${s.end}, ${s.branch}, ${s.status}`}
@@ -501,7 +528,11 @@ export default function Home() {
                                   </span>
                                 </button>
                               ) : (
-                                <div key={s.id} className="shift published">
+                                <div
+                                  key={s.id}
+                                  data-branch={branchTone[s.branch]}
+                                  className="shift published"
+                                >
                                   <strong>
                                     {s.start}–{s.end}
                                   </strong>
@@ -547,6 +578,15 @@ export default function Home() {
             </div>
             <div className="rota-footer">
               <div className="legend">
+                {BRANCHES.map((b) => (
+                  <span
+                    className="branch-badge"
+                    data-branch={branchTone[b]}
+                    key={b}
+                  >
+                    {b}
+                  </span>
+                ))}
                 <span>
                   <i className="live-key" /> Published
                 </span>
@@ -562,79 +602,40 @@ export default function Home() {
                   <i className="off-key" /> OFF
                 </span>
               </div>
-              <span>Times in Hong Kong · same-day shifts</span>
+              <span>
+                Scheduled hours, not paid hours · no break deductions · Hong
+                Kong
+              </span>
             </div>
           </section>
           <section className="lower-grid">
-            <div className="notes-panel">
-              <div className="section-title">
-                <h2>Availability inbox</h2>
-                <span>{manager ? "All team requests" : "Your requests"}</span>
-              </div>
-              {!manager && (
-                <label className="staff-picker" htmlFor="preview-employee">
-                  Preview as
-                  <select
-                    aria-label="Preview as"
-                    id="preview-employee"
-                    value={employee}
-                    onChange={(e) => setEmployee(e.target.value)}
-                  >
-                    {employees.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+            <AvailabilityInbox
+              records={data.availability}
+              shifts={data.shifts.filter(
+                (s) => manager || s.status === "published",
               )}
-              {visibleAvailability.length === 0 ? (
-                <p className="empty">
-                  No availability submitted. Add your preferred days to help
-                  plan the next rota.
-                </p>
-              ) : (
-                <div className="requests">
-                  {visibleAvailability.map((a) => (
-                    <div className="request" key={a.id}>
-                      <span className="request-initial">
-                        {employees
-                          .find((e) => e.id === a.employeeId)
-                          ?.name.charAt(0)}
-                      </span>
-                      <div>
-                        <strong>
-                          {employees.find((e) => e.id === a.employeeId)?.name}
-                        </strong>
-                        <p>
-                          {a.dates.join(", ")}
-                          <br />
-                          {a.allDay ? "All day" : `${a.start}–${a.end}`} ·{" "}
-                          {a.branches.join(" / ")}
-                        </p>
-                      </div>
-                      <button
-                        className="text-button"
-                        onClick={() =>
-                          save(
-                            {
-                              ...data,
-                              availability: data.availability.filter(
-                                (x) => x.id !== a.id,
-                              ),
-                            },
-                            "Availability removed.",
-                          )
-                        }
-                        aria-label={`Remove availability for ${employees.find((e) => e.id === a.employeeId)?.name} on ${a.dates.join(", ")}`}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+              manager={manager}
+              employee={employee}
+              onEmployee={setEmployee}
+              onEdit={editAvailability}
+              onRemove={(a) => {
+                if (!manager && a.employeeId !== employee) return;
+                if (
+                  confirm(
+                    "Remove this availability submission? Scheduled shifts will be kept.",
+                  )
+                )
+                  save(
+                    {
+                      ...data,
+                      availability: data.availability.filter(
+                        (x) => x.id !== a.id,
+                      ),
+                    },
+                    "Availability removed.",
+                  );
+              }}
+            />
             <div className="notes-panel planning-note">
               <Coffee size={25} />
               <h2>Room for a better rhythm.</h2>
@@ -743,6 +744,7 @@ export default function Home() {
                 Branch
                 <select
                   aria-label="Branch"
+                  data-branch={branchTone[shift.branch]}
                   id="shift-branch"
                   value={shift.branch}
                   onChange={(e) =>
@@ -796,6 +798,11 @@ export default function Home() {
               Same-day shifts only. Overlap checks include drafts at every
               branch.
             </p>
+            {availabilityWarning(shift, data.availability) && (
+              <p className="warning" role="status">
+                {availabilityWarning(shift, data.availability)}
+              </p>
+            )}
             {error && (
               <p role="alert" className="error">
                 {error}
@@ -834,7 +841,11 @@ export default function Home() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              const issue = validateAvailability(availability);
+              if (!manager && availability.employeeId !== employee) return;
+              const issue = validateAvailabilitySubmission(
+                availability,
+                data.availability,
+              );
               if (issue) {
                 setError(issue);
                 return;
@@ -843,11 +854,20 @@ export default function Home() {
                 {
                   ...data,
                   availability: [
-                    ...data.availability,
-                    { ...availability, id: crypto.randomUUID() },
+                    ...data.availability.filter(
+                      (a) => a.id !== availability.id,
+                    ),
+                    {
+                      ...availability,
+                      dates: [...availability.dates].sort(),
+                      id: availability.id || crypto.randomUUID(),
+                      submittedAt: availability.id
+                        ? availability.submittedAt
+                        : new Date().toISOString(),
+                    },
                   ],
                 },
-                "Availability submitted. This does not create a shift.",
+                "Availability saved. Scheduled shifts are unchanged.",
               );
               close();
             }}
@@ -960,7 +980,11 @@ export default function Home() {
               <legend>Preferred branches · choose one or more</legend>
               <div className="branch-checks">
                 {BRANCHES.map((b) => (
-                  <label key={b} className="checkbox-label">
+                  <label
+                    key={b}
+                    className="checkbox-label"
+                    data-branch={branchTone[b]}
+                  >
                     <input
                       type="checkbox"
                       checked={availability.branches.includes(b)}
@@ -978,6 +1002,22 @@ export default function Home() {
                 ))}
               </div>
             </fieldset>
+            <section
+              className="submission-summary"
+              aria-label="Availability summary"
+            >
+              <strong>Review before saving</strong>
+              <p>
+                {availability.dates.length
+                  ? availability.dates.join(", ")
+                  : "No dates selected"}
+                <br />
+                {availability.allDay
+                  ? "All day"
+                  : `${availability.start}–${availability.end}`}{" "}
+                · {availability.branches.join(" / ") || "No branches selected"}
+              </p>
+            </section>
             {error && (
               <p role="alert" className="error">
                 {error}

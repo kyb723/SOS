@@ -6,7 +6,7 @@ SOS 係一個適合手機使用嘅咖啡店排更 prototype。介面使用 Engli
 
 ## 開始使用（GitHub Codespaces）
 
-1. 喺 GitHub 開啟呢個 repository，揀包含 SOS prototype 嘅 branch（例如 `feat/sos-prototype`）。
+1. 喺 GitHub 開啟呢個 repository，揀包含 SOS prototype 嘅 branch（例如 `feat/sos-v2`）。
 2. 按 **Code → Codespaces → Create codespace on [branch]**。
 3. 等 VS Code 開好，喺上方選單按 **Terminal → New Terminal**。
 4. 確認 terminal 已喺 repository 根目錄（見到 `package.json`），逐行輸入：
@@ -31,7 +31,7 @@ npm run dev
 ```bash
 git clone https://github.com/kyb723/SOS.git
 cd SOS
-git switch feat/sos-prototype
+git switch feat/sos-v2
 npm install
 npm run dev
 ```
@@ -81,7 +81,7 @@ npm start
 ```
 
 - `lint`：檢查常見程式錯誤。
-- `test`：12 個 unit tests，涵蓋跨分店重疊、相連班次、修改、不同員工／日期、錯誤時間／日期、sample data 同 availability validation。
+- `test`：25 個 unit tests，涵蓋跨分店重疊、相連班次、修改、不同員工／日期、錯誤時間／日期、sample data 同 availability validation。
 - `build`：TypeScript 檢查同 production build。
 - `start`：先完成 build，然後啟動 production server。請先停止 `dev`，避免用緊同一個 port。
 - 有 lockfile 後，重現同一版本可用 `npm ci` 代替 `npm install`。
@@ -105,3 +105,24 @@ tests/scheduling.test.ts
 使用 Taste Skill 嘅 app-screen 指引，同 Impeccable 主文件嘅 Operate mode：中性深色底、低干擾 navigation、綠色班次、draft 虛線、availability 外框、可橫向滑動月曆。冇複製 Dozy HR branding；本次冇收到參考截圖。Cloud skill 附屬腳本／部分 references 未能讀取，冇聲稱執行過 skill inspector。
 
 呢個版本冇薪酬計算、法定休息規則、最低人手檢查、正式休假、跨午夜排更或多人同步。員工姓名同數據全部虛構。
+
+## Version 2 更新
+
+- **ST 綠色、CSW 暖橙色、SOHO W 淡紫色**：全部由 `globals.css` 嘅 branch tokens 控制；班次保留分店名稱，draft 用虛線同 Draft 字樣，published 用實線同 Live 字樣，唔需要單靠顏色辨認。
+- **Availability inbox** 預設顯示所有月份、所有提交。經理可揀 All employees 或單一員工；Staff 只可管理 Preview as 所選員工。Inbox 有獨立 Optional month 篩選，按 All months 取消；上方 rota 嘅分店／月份篩選唔會隱藏歷史。
+- 提交可以 **Edit／Remove**；多日期提交會整筆編輯或移除，唔影響已排班次。相同員工、日期、時間同分店組合唔可重複提交。儲存前有 Review before saving 摘要。
+- 新提交有 Submitted timestamp（HKT）。舊資料冇記錄提交時間會顯示 Not recorded (legacy demo)，唔會虛構日期。編輯會保留原本 timestamp。
+- 每位員工名旁顯示目前月份／分店篩選內嘅 **published scheduled hours**，Manager 另列 `+Nh draft`。無更顯示 0h；唔計 availability、唔扣 break，唔係 paid hours。整體工時統計如果包含 draft 亦有標示。
+- 經理排更超出提交時間／分店，或冇提交 availability 時會見到 warning。呢個係提示，唔係硬性禁止；時間重疊依然唔容許。
+
+### Availability 排更狀態定義
+
+每個提交可以包含多日，狀態由目前班次即時計算：
+
+- **Scheduled**：提交每一日都有班次，而且該日所有已排班次都完整落喺提交時間內，同時屬於可接受分店。
+- **Partially Scheduled**：部分日期／時間已有符合分店且與可上班時間重疊嘅班次，但未達以上條件。
+- **Not Scheduled**：冇符合日期、分店同時間交集嘅班次；單純同日有其他分店或完全超出時間嘅更唔會當已排。
+
+Staff 用 published shifts 計算；Manager 包含 drafts，Inbox 會清楚標示。唔代表必須排滿整段 availability，亦唔代表最低人手已足夠。刪更後會重算狀態，提交紀錄仍保留。
+
+沿用 `sos.demo.v1` 同 version 1 schema；只新增 backwards-compatible optional `submittedAt`。唔使 reset 舊資料。詳細驗證見 `docs/VERSION_2.md`。

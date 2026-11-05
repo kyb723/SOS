@@ -11,6 +11,7 @@ export type Shift = {
   status: "draft" | "published";
 };
 export type Availability = {
+  submittedAt?: string;
   id: string;
   employeeId: string;
   dates: string[];
@@ -107,16 +108,119 @@ export function makeSeed(now = new Date()): DemoData {
   return {
     version: 1,
     shifts,
-    availability: employees
-      .slice(0, 3)
-      .map((e, i) => ({
-        id: `available-${i}`,
-        employeeId: e.id,
-        dates: [dateKey(new Date(now.getFullYear(), now.getMonth(), 7 - i))],
-        start: "09:00",
-        end: "18:00",
-        allDay: i === 0,
-        branches: [...BRANCHES],
-      })),
+    availability: employees.slice(0, 3).map((e, i) => ({
+      id: `available-${i}`,
+      employeeId: e.id,
+      dates: [dateKey(new Date(now.getFullYear(), now.getMonth(), 7 - i))],
+      start: "09:00",
+      end: "18:00",
+      allDay: i === 0,
+      branches: [...BRANCHES],
+    })),
   };
+}
+
+export const branchTone: Record<Branch, string> = {
+  ST: "st",
+  CSW: "csw",
+  "SOHO W": "soho",
+};
+export function shiftHours(s: Shift) {
+  return (minutes(s.end) - minutes(s.start)) / 60;
+}
+function minutes(time: string) {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+export function filterShifts(
+  shifts: Shift[],
+  month: string,
+  branch: Branch | "All",
+  manager: boolean,
+) {
+  return shifts.filter(
+    (s) =>
+      s.date.startsWith(month) &&
+      (branch === "All" || s.branch === branch) &&
+      (manager || s.status === "published"),
+  );
+}
+export function employeeHours(shifts: Shift[], employeeId: string) {
+  const own = shifts.filter((s) => s.employeeId === employeeId);
+  return {
+    published: own
+      .filter((s) => s.status === "published")
+      .reduce((n, s) => n + shiftHours(s), 0),
+    draft: own
+      .filter((s) => s.status === "draft")
+      .reduce((n, s) => n + shiftHours(s), 0),
+  };
+}
+export function formatHours(hours: number) {
+  return Number(hours.toFixed(2)).toString();
+}
+export function availabilityCovers(a: Availability, s: Shift) {
+  return (
+    a.employeeId === s.employeeId &&
+    a.dates.includes(s.date) &&
+    a.branches.includes(s.branch) &&
+    (a.allDay || (a.start <= s.start && a.end >= s.end))
+  );
+}
+export function availabilityStatus(
+  a: Availability,
+  shifts: Shift[],
+): "Not Scheduled" | "Partially Scheduled" | "Scheduled" {
+  const days = a.dates.map((date) => {
+    const assigned = shifts.filter(
+      (s) => s.employeeId === a.employeeId && s.date === date,
+    );
+    return {
+      full:
+        assigned.length > 0 && assigned.every((s) => availabilityCovers(a, s)),
+      partial: assigned.some(
+        (s) =>
+          a.branches.includes(s.branch) &&
+          (a.allDay || (s.start < a.end && a.start < s.end)),
+      ),
+    };
+  });
+  if (days.length && days.every((d) => d.full)) return "Scheduled";
+  if (days.some((d) => d.partial)) return "Partially Scheduled";
+  return "Not Scheduled";
+}
+export function availabilityWarning(s: Shift, availability: Availability[]) {
+  const sameDay = availability.filter(
+    (a) => a.employeeId === s.employeeId && a.dates.includes(s.date),
+  );
+  if (!sameDay.length)
+    return "No availability submitted for this date. Confirm with the employee before saving.";
+  if (!sameDay.some((a) => availabilityCovers(a, s)))
+    return "Outside submitted availability: check time range and acceptable branches before saving.";
+  return null;
+}
+export function validateAvailabilitySubmission(
+  a: Availability,
+  records: Availability[],
+) {
+  const error = validateAvailability(a);
+  if (error) return error;
+  if (new Set(a.dates).size !== a.dates.length)
+    return "Remove duplicate dates.";
+  const samePreferences = (b: Availability) =>
+    a.allDay === b.allDay &&
+    (a.allDay || (a.start === b.start && a.end === b.end)) &&
+    [...new Set(a.branches)].sort().join("|") ===
+      [...new Set(b.branches)].sort().join("|");
+  if (
+    records.some(
+      (b) =>
+        b.id !== a.id &&
+        b.employeeId === a.employeeId &&
+        samePreferences(b) &&
+        b.dates.some((d) => a.dates.includes(d)),
+    )
+  )
+    return "An identical availability entry already exists for one of these dates. Edit the existing submission instead.";
+  return null;
 }
