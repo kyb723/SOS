@@ -1623,3 +1623,151 @@ dialog .dialog-actions {
     outline-offset: -3px;
   }
 }
+
+/* V4: rota-first workflow and readable, compact shift times. */
+.rota-heading {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.rota-heading > .actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.actions .primary {
+  white-space: normal;
+}
+.invalid-notice {
+  margin: 0 22px 18px;
+  padding: 12px;
+  border: 1px solid #805c3d;
+  border-radius: 8px;
+  background: #302820;
+  color: #f4d3a9;
+  font-size: 12px;
+}
+.invalid-label {
+  display: block !important;
+  font-size: 11px;
+  color: #ffdfab;
+  white-space: normal;
+}
+.grid-availability button {
+  width: 100%;
+  text-align: left;
+}
+.grid-edit {
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 8px 0;
+  min-height: 36px;
+}
+.history-button {
+  margin-bottom: 18px;
+  white-space: normal;
+}
+.permitted-windows {
+  font-size: 12px;
+  margin: 14px 0;
+}
+.permitted-windows label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.permitted-windows p {
+  color: var(--muted);
+  margin-top: 8px;
+}
+.permitted-windows p.error {
+  color: #ffdbb8;
+}
+.day-availability {
+  margin: 18px 0;
+}
+.day-availability h3 {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+.day-availability button {
+  margin-top: 8px;
+}
+.request-content {
+  overflow-wrap: anywhere;
+}
+dialog .notes-panel {
+  border: 0;
+  padding: 0;
+  background: none;
+}
+.legend .sh-key {
+  background: var(--sh-fill);
+}
+.compact-time {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+.compact-shift small {
+  font-size: 10px;
+}
+.compact-shift {
+  padding: 5px 0;
+}
+.week-table td,
+.week-day {
+  min-height: 80px;
+}
+@media (max-width: 760px) {
+  .rota-heading > .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 8px;
+  }
+  .actions button {
+    min-width: 0;
+    white-space: normal;
+    padding: 9px 6px;
+  }
+  .actions button:last-child:nth-child(4) {
+    font-size: 11px;
+  }
+  .invalid-notice {
+    margin: 0 14px 14px;
+    font-size: 11px;
+  }
+  .week-table th:first-child {
+    width: 66px;
+    padding: 6px;
+  }
+  .compact-time {
+    font-size: 12px;
+    letter-spacing: -0.5px;
+  }
+  .compact-shift small {
+    font-size: 10px;
+  }
+  .week-day {
+    padding: 2px;
+    min-height: 80px;
+  }
+  .week-table td {
+    height: 80px;
+  }
+  .mobile-help {
+    font-size: 11px;
+  }
+  .legend {
+    gap: 10px;
+  }
+  .week-table td .compact-shift {
+    border-radius: 5px;
+  }
+  .rota-summary {
+    gap: 10px;
+  }
+}

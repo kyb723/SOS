@@ -1,4 +1,8 @@
-import { SH_CODES, FULL_TIME_EMPLOYEE_IDS } from "./rota-config";
+import {
+  SH_CODES,
+  FULL_TIME_EMPLOYEE_IDS,
+  BRANCH_OPERATING_HOURS,
+} from "./rota-config";
 export const BRANCHES = ["ST", "CSW", "SOHO W"] as const;
 export type Branch = (typeof BRANCHES)[number];
 export type Employee = { id: string; name: string; role: string };
@@ -172,11 +176,8 @@ export function formatHours(hours: number) {
   return Number(hours.toFixed(2)).toString();
 }
 export function availabilityCovers(a: Availability, s: Shift) {
-  return (
-    a.employeeId === s.employeeId &&
-    a.dates.includes(s.date) &&
-    a.branches.includes(s.branch) &&
-    (a.allDay || (a.start <= s.start && a.end >= s.end))
+  return availabilityWindows(s.employeeId, s.date, [a]).some(
+    (w) => w.branch === s.branch && w.start <= s.start && w.end >= s.end,
   );
 }
 export function availabilityStatus(
@@ -190,10 +191,10 @@ export function availabilityStatus(
     return {
       full:
         assigned.length > 0 && assigned.every((s) => availabilityCovers(a, s)),
-      partial: assigned.some(
-        (s) =>
-          a.branches.includes(s.branch) &&
-          (a.allDay || (s.start < a.end && a.start < s.end)),
+      partial: assigned.some((s) =>
+        availabilityWindows(s.employeeId, s.date, [a]).some(
+          (w) => w.branch === s.branch && s.start < w.end && w.start < s.end,
+        ),
       ),
     };
   });
@@ -303,4 +304,93 @@ export function filterHolidays(
       (manager || h.status === "published") &&
       (branch === "All" || h.branch === branch),
   );
+}
+
+export type AvailabilityWindow = {
+  availabilityId: string;
+  branch: Branch;
+  start: string;
+  end: string;
+};
+export function availabilityWindows(
+  employeeId: string,
+  date: string,
+  records: Availability[],
+): AvailabilityWindow[] {
+  return records
+    .filter((a) => a.employeeId === employeeId && a.dates.includes(date))
+    .flatMap((a) =>
+      a.branches.map((branch) => ({
+        availabilityId: a.id,
+        branch,
+        ...(a.allDay
+          ? BRANCH_OPERATING_HOURS[branch]
+          : { start: a.start, end: a.end }),
+      })),
+    )
+    .filter((w) => validTime(w.start) && validTime(w.end) && w.start < w.end);
+}
+export function validateScheduledShift(
+  s: Shift,
+  shifts: Shift[],
+  availability: Availability[],
+  holidays: StatutoryHoliday[] = [],
+): string | null {
+  const issue = validateShift(s, shifts, holidays);
+  if (issue) return issue;
+  const windows = availabilityWindows(s.employeeId, s.date, availability);
+  if (!windows.length)
+    return "No submitted availability for this employee and date. Submit availability first.";
+  if (!windows.some((w) => w.branch === s.branch))
+    return "This branch is not permitted by the submitted availability.";
+  if (
+    !windows.some(
+      (w) => w.branch === s.branch && w.start <= s.start && w.end >= s.end,
+    )
+  )
+    return "The entire shift must fit within one submitted availability interval for this branch.";
+  return null;
+}
+export function planMonthlyPublication(
+  data: DemoData,
+  month: string,
+): { errors: string[]; count: number; data: DemoData } {
+  const shifts = data.shifts.filter(
+    (s) => s.status === "draft" && s.date.startsWith(month),
+  );
+  const holidays = (data.shItems ?? []).filter(
+    (h) => h.status === "draft" && h.date.startsWith(month),
+  );
+  const errors = [
+    ...shifts.map((s) => {
+      const error = validateScheduledShift(
+        s,
+        data.shifts,
+        data.availability,
+        data.shItems,
+      );
+      return error
+        ? `${employees.find((e) => e.id === s.employeeId)?.name ?? s.employeeId} · ${s.date} · ${s.branch} ${s.start}–${s.end}: ${error}`
+        : null;
+    }),
+    ...holidays.map((h) => {
+      const error = validateHoliday(h, data.shItems ?? [], data.shifts);
+      return error ? `${h.employeeId} · ${h.date} · ${h.code}: ${error}` : null;
+    }),
+  ].filter((e): e is string => !!e);
+  if (errors.length)
+    return { errors, count: shifts.length + holidays.length, data };
+  return {
+    errors,
+    count: shifts.length + holidays.length,
+    data: {
+      ...data,
+      shifts: data.shifts.map((s) =>
+        shifts.some((d) => d.id === s.id) ? { ...s, status: "published" } : s,
+      ),
+      shItems: (data.shItems ?? []).map((h) =>
+        holidays.some((d) => d.id === h.id) ? { ...h, status: "published" } : h,
+      ),
+    },
+  };
 }

@@ -173,7 +173,7 @@ import assert from "node:assert/strict";
     await page
       .getByRole("button", { name: "Manager Demo", exact: true })
       .click();
-    await page.getByRole("button", { name: "+ SH item", exact: true }).click();
+    await page.getByRole("button", { name: "+ SH", exact: true }).click();
     d = page.getByRole("dialog");
     await d.getByLabel("SH date").fill(key(10));
     await d.getByLabel("SH code", { exact: true }).selectOption("SH03");
@@ -197,7 +197,10 @@ import assert from "node:assert/strict";
     await page
       .getByRole("button", { name: "Manager Demo", exact: true })
       .click();
-    await page.getByRole("button", { name: /Publish 1 drafts/ }).click();
+    await page.getByRole("button", { name: /Publish Rota.*\(1\)/ }).click();
+    await page
+      .getByRole("button", { name: "Confirm publish 1 items", exact: true })
+      .click();
     await page.getByRole("button", { name: "Staff Demo", exact: true }).click();
     assert.equal(await page.locator(".desktop-rota .sh-item").count(), 1);
     assert.match(

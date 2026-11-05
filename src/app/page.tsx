@@ -10,7 +10,6 @@ import {
   Coffee,
   RotateCcw,
   X,
-  Check,
   ArrowUpRight,
 } from "lucide-react";
 import {
@@ -27,9 +26,10 @@ import {
   formatHours,
   shiftHours,
   filterShifts,
-  availabilityWarning,
+  availabilityWindows,
+  validateScheduledShift,
+  planMonthlyPublication,
   validateAvailabilitySubmission,
-  validateShift,
   StatutoryHoliday,
   conflictingAvailability,
   filterHolidays,
@@ -43,7 +43,9 @@ import MobileRota from "./mobile-rota";
 import HolidayEditor from "./holiday-editor";
 import { SH_CODES } from "@/lib/rota-config";
 
-type Editor = "shift" | "availability" | null;
+import PublishRota from "./publish-rota";
+
+type Editor = "shift" | "availability" | "history" | null;
 const blankShift = (date: string): Shift => ({
   id: "",
   employeeId: employees[0].id,
@@ -68,6 +70,7 @@ export default function Home() {
     shifts: [],
     availability: [],
   });
+  const [publishOpen, setPublishOpen] = useState(false);
   const [weekReset, setWeekReset] = useState(0);
   const [ready, setReady] = useState(false);
   const [manager, setManager] = useState(false);
@@ -114,17 +117,20 @@ export default function Home() {
     }
   }, [editor, availability.id]);
   const save = (next: DemoData, message: string) => {
-    setData(next);
     try {
       localScheduleRepository.save(next);
-      setStorageWarning("");
     } catch {
       setStorageWarning(
-        "Browser storage is unavailable or full. Changes work for this visit but will not survive a reload.",
+        "Changes were not saved. Browser storage is unavailable or full. Your current rota is unchanged.",
       );
+      return false;
     }
+    setData(next);
+    setStorageWarning("");
     setNotice(message);
+    return true;
   };
+
   const close = () => {
     setEditor(null);
     setError("");
@@ -164,12 +170,46 @@ export default function Home() {
   const shItems = data.shItems ?? [];
   const shownSH = filterHolidays(shItems, branch, manager);
   const monthlySH = shownSH.filter((h) => h.date.startsWith(prefix));
-  const draftSH = monthlySH.filter((h) => h.status === "draft");
   const availabilityConflicts = conflictingAvailability(
     availability,
     data.availability,
   );
-  const drafts = visible.filter((s) => s.status === "draft");
+  const windows = availabilityWindows(
+    shift.employeeId,
+    shift.date,
+    data.availability,
+  );
+  const permittedBranches = [...new Set(windows.map((w) => w.branch))];
+  const activeWindow =
+    windows.find(
+      (w) =>
+        w.branch === shift.branch &&
+        w.start <= shift.start &&
+        w.end >= shift.end,
+    ) ?? windows.find((w) => w.branch === shift.branch);
+  const publication = planMonthlyPublication(data, prefix);
+  const invalidShifts = data.shifts.filter(
+    (s) =>
+      s.date.startsWith(prefix) &&
+      validateScheduledShift(s, data.shifts, data.availability, shItems),
+  );
+  const fromAvailability = (employeeId: string, date: string) => {
+    const window =
+      availabilityWindows(employeeId, date, data.availability).find(
+        (w) => branch === "All" || w.branch === branch,
+      ) ?? availabilityWindows(employeeId, date, data.availability)[0];
+    if (!window) return;
+    trigger.current = document.activeElement as HTMLElement;
+    setShift({
+      ...blankShift(date),
+      employeeId,
+      branch: window.branch,
+      start: window.start,
+      end: window.end,
+    });
+    setError("");
+    setEditor("shift");
+  };
   const monthTitle = month.toLocaleDateString("en-GB", {
     month: "long",
     year: "numeric",
@@ -178,32 +218,6 @@ export default function Home() {
     (n, a) => n + a.dates.filter((d) => d.startsWith(prefix)).length,
     0,
   );
-  const publish = () => {
-    const next = data.shifts.map((s) =>
-      drafts.some((d) => d.id === s.id)
-        ? { ...s, status: "published" as const }
-        : s,
-    );
-    const issue = next
-      .map((s) => validateShift(s, next, shItems))
-      .find(Boolean);
-    if (issue) {
-      setNotice(issue);
-      return;
-    }
-    save(
-      {
-        ...data,
-        shifts: next,
-        shItems: shItems.map((h) =>
-          draftSH.some((d) => d.id === h.id)
-            ? { ...h, status: "published" as const }
-            : h,
-        ),
-      },
-      `${drafts.length + draftSH.length} rota items published for ${branch === "All" ? "all branches" : branch}.`,
-    );
-  };
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -252,6 +266,7 @@ export default function Home() {
               className={!manager ? "selected" : ""}
               onClick={() => {
                 setManager(false);
+                setPublishOpen(false);
                 setHoliday(null);
                 close();
               }}
@@ -263,6 +278,7 @@ export default function Home() {
               className={manager ? "selected" : ""}
               onClick={() => {
                 setManager(true);
+                setPublishOpen(false);
                 setHoliday(null);
                 close();
               }}
@@ -371,26 +387,40 @@ export default function Home() {
                     <Plus size={16} /> Add shift
                   </button>
                 )}
+                {manager && (
+                  <>
+                    <button
+                      className="subtle"
+                      onClick={() =>
+                        setHoliday({
+                          id: "",
+                          employeeId: "alex",
+                          date: dateKey(month),
+                          branch: branch === "All" ? "ST" : branch,
+                          code: SH_CODES[0],
+                          status: "draft",
+                        })
+                      }
+                    >
+                      + SH
+                    </button>
+                    <button
+                      className="primary"
+                      disabled={!ready || !publication.count}
+                      onClick={() => setPublishOpen(true)}
+                    >
+                      Publish Rota · {monthTitle} ({publication.count})
+                    </button>
+                  </>
+                )}
               </div>
             </div>
-            {manager && (
-              <div className="sh-toolbar">
-                <button
-                  className="subtle"
-                  onClick={() =>
-                    setHoliday({
-                      id: "",
-                      employeeId: "alex",
-                      date: dateKey(month),
-                      branch: branch === "All" ? "ST" : branch,
-                      code: SH_CODES[0],
-                      status: "draft",
-                    })
-                  }
-                >
-                  + SH item
-                </button>
-                <span>Full-time statutory holiday recording</span>
+            {manager && invalidShifts.length > 0 && (
+              <div className="invalid-notice" role="status">
+                {invalidShifts.length} existing shifts in {monthTitle} need
+                correction under the availability rules. They have been
+                preserved and marked Invalid. Invalid drafts block monthly
+                publication.
               </div>
             )}
             <div className="rota-toolbar">
@@ -461,16 +491,6 @@ export default function Home() {
               <span>
                 <strong>{availableCount}</strong> available days
               </span>
-              {manager && (
-                <button
-                  className="publish"
-                  disabled={!drafts.length && !draftSH.length}
-                  onClick={publish}
-                >
-                  <Check size={15} /> Publish {drafts.length + draftSH.length}{" "}
-                  drafts
-                </button>
-              )}
             </div>
             <p className="scroll-hint">
               Swipe or scroll sideways to see the full month.
@@ -490,6 +510,9 @@ export default function Home() {
               manager={manager}
               onShift={(s) => open("shift", s)}
               onHoliday={setHoliday}
+              onAvailability={(id, date) => fromAvailability(id, date)}
+              onEditAvailability={editAvailability}
+              invalidIds={invalidShifts.map((s) => s.id)}
             />
             <div
               className="table-scroll desktop-rota"
@@ -609,6 +632,14 @@ export default function Home() {
                                   aria-label={`Edit ${e.name}, ${s.date}, ${s.start} to ${s.end}, ${s.branch}, ${s.status}`}
                                 >
                                   <strong>
+                                    {manager &&
+                                      invalidShifts.some(
+                                        (x) => x.id === s.id,
+                                      ) && (
+                                        <span className="invalid-label">
+                                          Invalid
+                                        </span>
+                                      )}
                                     {s.start}–{s.end}
                                   </strong>
                                   <span>
@@ -625,6 +656,14 @@ export default function Home() {
                                   className="shift published"
                                 >
                                   <strong>
+                                    {manager &&
+                                      invalidShifts.some(
+                                        (x) => x.id === s.id,
+                                      ) && (
+                                        <span className="invalid-label">
+                                          Invalid
+                                        </span>
+                                      )}
                                     {s.start}–{s.end}
                                   </strong>
                                   <span>
@@ -634,24 +673,43 @@ export default function Home() {
                               ),
                             )}
                             {available.length > 0 && (
-                              <div
-                                className="availability-mark"
-                                title={available
-                                  .map(
-                                    (a) =>
-                                      `${a.allDay ? "All day" : a.start + "–" + a.end} · ${a.branches.join(", ")}`,
-                                  )
-                                  .join("; ")}
-                              >
-                                Available
-                                {available.map((a) => (
-                                  <small key={a.id}>
-                                    {a.allDay
-                                      ? "All day"
-                                      : `${a.start}–${a.end}`}{" "}
-                                    · {a.branches.join("/")}
-                                  </small>
-                                ))}
+                              <div className="grid-availability">
+                                {manager ? (
+                                  <button
+                                    className="availability-mark"
+                                    onClick={() => fromAvailability(e.id, key)}
+                                    aria-label={`Schedule ${e.name} on ${key} from availability`}
+                                  >
+                                    Av · Add shift
+                                    {available.map((a) => (
+                                      <small key={a.id}>
+                                        {a.allDay
+                                          ? "All day"
+                                          : `${a.start}–${a.end}`}{" "}
+                                        · {a.branches.join("/")}
+                                      </small>
+                                    ))}
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="availability-mark"
+                                    onClick={() =>
+                                      editAvailability(available[0])
+                                    }
+                                  >
+                                    Av · Edit availability
+                                  </button>
+                                )}
+                                {manager &&
+                                  available.map((a) => (
+                                    <button
+                                      key={a.id}
+                                      className="grid-edit"
+                                      onClick={() => editAvailability(a)}
+                                    >
+                                      Review / edit submission
+                                    </button>
+                                  ))}
                               </div>
                             )}
                             {!shifts.length &&
@@ -673,9 +731,6 @@ export default function Home() {
             </div>
             <div className="rota-footer">
               <div className="legend">
-                <span>
-                  <i className="sh-key" /> SH · zero hours
-                </span>
                 {BRANCHES.map((b) => (
                   <span
                     className="branch-badge"
@@ -699,55 +754,14 @@ export default function Home() {
                 <span>
                   <i className="off-key" /> OFF
                 </span>
+                <span>
+                  <i className="sh-key" /> SH
+                </span>
               </div>
               <span>
                 Scheduled hours, not paid hours · no break deductions · Hong
                 Kong
               </span>
-            </div>
-          </section>
-          <section className="lower-grid">
-            <AvailabilityInbox
-              records={data.availability}
-              shifts={data.shifts.filter(
-                (s) => manager || s.status === "published",
-              )}
-              manager={manager}
-              employee={employee}
-              onEmployee={setEmployee}
-              onEdit={editAvailability}
-              onRemove={(a) => {
-                if (!manager && a.employeeId !== employee) return;
-                if (
-                  confirm(
-                    "Remove this availability submission? Scheduled shifts will be kept.",
-                  )
-                )
-                  save(
-                    {
-                      ...data,
-                      availability: data.availability.filter(
-                        (x) => x.id !== a.id,
-                      ),
-                    },
-                    "Availability removed.",
-                  );
-              }}
-            />
-            <div className="notes-panel planning-note">
-              <Coffee size={25} />
-              <h2>Room for a better rhythm.</h2>
-              <p>
-                Availability is a preference, not an assigned shift. Managers
-                can plan across branches; SOS checks for overlapping times
-                before saving.
-              </p>
-              <div>
-                <span className="local-dot" />{" "}
-                {manager
-                  ? "Drafts stay private until published."
-                  : "Only published shifts appear in Staff Demo."}
-              </div>
             </div>
           </section>
           <footer className="page-footer">
@@ -756,6 +770,16 @@ export default function Home() {
           </footer>
         </main>
       </div>
+      {manager && publishOpen && (
+        <PublishRota
+          data={data}
+          month={prefix}
+          onClose={() => setPublishOpen(false)}
+          onPublish={(next) =>
+            save(next, `Rota published for ${monthTitle} across all branches.`)
+          }
+        />
+      )}
       {manager && holiday && (
         <HolidayEditor
           key={holiday.id || "new"}
@@ -764,14 +788,19 @@ export default function Home() {
           shifts={data.shifts}
           onClose={() => setHoliday(null)}
           onSave={(h) => {
-            save(
+            if (
+              shItems.find((x) => x.id === h.id)?.status === "published" &&
+              !confirm("Apply these changes to the published SH item?")
+            )
+              return;
+            const saved = save(
               {
                 ...data,
                 shItems: [...shItems.filter((x) => x.id !== h.id), h],
               },
               "SH item saved. It adds zero working hours.",
             );
-            setHoliday(null);
+            if (saved) setHoliday(null);
           }}
           onDelete={(id) => {
             save(
@@ -803,7 +832,9 @@ export default function Home() {
                 ? shift.id
                   ? "Edit shift"
                   : "Plan a shift"
-                : "When can you work?"}
+                : editor === "history"
+                  ? "Availability history"
+                  : "When can you work?"}
             </h2>
           </div>
           <button
@@ -819,12 +850,25 @@ export default function Home() {
             onSubmit={(e) => {
               e.preventDefault();
               if (!manager) return;
-              const issue = validateShift(shift, data.shifts, shItems);
+              const issue = validateScheduledShift(
+                shift,
+                data.shifts,
+                data.availability,
+                shItems,
+              );
               if (issue) {
                 setError(issue);
                 return;
               }
-              save(
+              if (
+                data.shifts.find((s) => s.id === shift.id)?.status ===
+                  "published" &&
+                !confirm(
+                  "Apply these changes to the published shift? Staff visibility will follow the selected status.",
+                )
+              )
+                return;
+              const saved = save(
                 {
                   ...data,
                   shifts: [
@@ -834,7 +878,7 @@ export default function Home() {
                 },
                 "Shift saved. Drafts are hidden in Staff Demo.",
               );
-              close();
+              if (saved) close();
             }}
           >
             <label htmlFor="shift-employee">
@@ -872,10 +916,24 @@ export default function Home() {
                   id="shift-branch"
                   value={shift.branch}
                   onChange={(e) =>
-                    setShift({ ...shift, branch: e.target.value as Branch })
+                    setShift((prev) => {
+                      const w = windows.find(
+                        (w) => w.branch === e.target.value,
+                      );
+                      return {
+                        ...prev,
+                        branch: e.target.value as Branch,
+                        ...(w ? { start: w.start, end: w.end } : {}),
+                      };
+                    })
                   }
                 >
-                  {BRANCHES.map((b) => (
+                  {!permittedBranches.includes(shift.branch) && (
+                    <option value={shift.branch} disabled>
+                      Choose an allowed branch
+                    </option>
+                  )}
+                  {permittedBranches.map((b) => (
                     <option key={b}>{b}</option>
                   ))}
                 </select>
@@ -885,6 +943,8 @@ export default function Home() {
                 <input
                   required
                   type="time"
+                  min={activeWindow?.start}
+                  max={activeWindow?.end}
                   value={shift.start}
                   onChange={(e) =>
                     setShift({ ...shift, start: e.target.value })
@@ -896,6 +956,8 @@ export default function Home() {
                 <input
                   required
                   type="time"
+                  min={activeWindow?.start}
+                  max={activeWindow?.end}
                   value={shift.end}
                   onChange={(e) => setShift({ ...shift, end: e.target.value })}
                 />
@@ -922,11 +984,44 @@ export default function Home() {
               Same-day shifts only. Overlap checks include drafts at every
               branch.
             </p>
-            {availabilityWarning(shift, data.availability) && (
-              <p className="warning" role="status">
-                {availabilityWarning(shift, data.availability)}
+            <section className="permitted-windows">
+              <label>
+                Permitted availability interval
+                <select
+                  aria-label="Permitted availability interval"
+                  value={activeWindow ? windows.indexOf(activeWindow) : -1}
+                  onChange={(e) => {
+                    const w = windows[Number(e.target.value)];
+                    if (w)
+                      setShift({
+                        ...shift,
+                        branch: w.branch,
+                        start: w.start,
+                        end: w.end,
+                      });
+                  }}
+                >
+                  <option value={-1} disabled>
+                    No matching availability
+                  </option>
+                  {windows.map((w, i) => (
+                    <option key={i} value={i}>
+                      {w.branch} · {w.start}–{w.end}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p>
+                Each shift must fit entirely inside one listed interval. All-day
+                submissions use configured branch operating hours.
               </p>
-            )}
+              {!windows.length && (
+                <p className="error">
+                  No availability for this date. Submit availability before
+                  adding a working shift.
+                </p>
+              )}
+            </section>
             {error && (
               <p role="alert" className="error">
                 {error}
@@ -961,6 +1056,40 @@ export default function Home() {
               </button>
             </div>
           </form>
+        ) : editor === "history" ? (
+          <>
+            {" "}
+            <AvailabilityInbox
+              records={data.availability}
+              shifts={data.shifts.filter(
+                (s) => manager || s.status === "published",
+              )}
+              manager={manager}
+              employee={employee}
+              onEmployee={setEmployee}
+              onEdit={editAvailability}
+              onRemove={(a) => {
+                if (!manager && a.employeeId !== employee) return;
+                if (
+                  confirm(
+                    "Remove this availability submission? Scheduled shifts will be kept.",
+                  )
+                )
+                  save(
+                    {
+                      ...data,
+                      availability: data.availability.filter(
+                        (x) => x.id !== a.id,
+                      ),
+                    },
+                    "Availability removed.",
+                  );
+              }}
+            />
+            <button className="primary" onClick={() => open("availability")}>
+              Submit new availability
+            </button>
+          </>
         ) : (
           <form
             onSubmit={(e) => {
@@ -974,7 +1103,7 @@ export default function Home() {
                 setError(issue);
                 return;
               }
-              save(
+              const saved = save(
                 {
                   ...data,
                   availability: [
@@ -993,9 +1122,16 @@ export default function Home() {
                 },
                 "Availability saved. Scheduled shifts are unchanged.",
               );
-              close();
+              if (saved) close();
             }}
           >
+            <button
+              type="button"
+              className="subtle history-button"
+              onClick={() => setEditor("history")}
+            >
+              View / edit complete availability history
+            </button>
             <label htmlFor="availability-employee">
               Team member
               <select

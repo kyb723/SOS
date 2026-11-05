@@ -21,6 +21,9 @@ function DayDetails({
   onShift,
   onHoliday,
   onClose,
+  onAvailability,
+  onEditAvailability,
+  invalidIds,
 }: {
   employeeId: string;
   date: string;
@@ -31,6 +34,9 @@ function DayDetails({
   onShift: (s: Shift) => void;
   onHoliday: (h: StatutoryHoliday) => void;
   onClose: () => void;
+  onAvailability: (id: string, date: string) => void;
+  onEditAvailability: (a: Availability) => void;
+  invalidIds: string[];
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -70,6 +76,11 @@ function DayDetails({
             {s.start}–{s.end} · {s.branch}
           </strong>
           <p>
+            {invalidIds.includes(s.id) && (
+              <strong className="invalid-label">
+                Invalid · correct availability before publishing
+              </strong>
+            )}
             {s.status} ·{" "}
             {formatHours(
               (+s.end.slice(0, 2) * 60 +
@@ -111,12 +122,39 @@ function DayDetails({
           )}
         </div>
       ))}
-      {availability.map((a) => (
-        <p className="availability-mark" key={a.id}>
-          Available: {a.allDay ? "All day" : `${a.start}–${a.end}`} ·{" "}
-          {a.branches.join(" / ")}
-        </p>
-      ))}
+      {availability.length > 0 && (
+        <section className="day-availability">
+          <h3>Submitted availability</h3>
+          {availability.map((a) => (
+            <div key={a.id} className="availability-mark">
+              {a.allDay
+                ? "All day (branch opening hours)"
+                : `${a.start}–${a.end}`}{" "}
+              · {a.branches.join(" / ")}
+              <button
+                className="subtle"
+                onClick={() => {
+                  onClose();
+                  onEditAvailability(a);
+                }}
+              >
+                Review / edit submission
+              </button>
+            </div>
+          ))}
+          {manager && (
+            <button
+              className="primary"
+              onClick={() => {
+                onClose();
+                onAvailability(employeeId, date);
+              }}
+            >
+              Add shift from availability
+            </button>
+          )}
+        </section>
+      )}
       {!shifts.length && !holidays.length && (
         <p>No scheduled item in this view.</p>
       )}
@@ -135,6 +173,9 @@ export default function MobileRota({
   manager,
   onShift,
   onHoliday,
+  onAvailability,
+  onEditAvailability,
+  invalidIds,
 }: {
   month: Date;
   shifts: Shift[];
@@ -144,6 +185,9 @@ export default function MobileRota({
   manager: boolean;
   onShift: (s: Shift) => void;
   onHoliday: (h: StatutoryHoliday) => void;
+  onAvailability: (id: string, date: string) => void;
+  onEditAvailability: (a: Availability) => void;
+  invalidIds: string[];
 }) {
   const [anchor, setAnchor] = useState(() => {
     const now = new Date();
@@ -237,7 +281,9 @@ export default function MobileRota({
                         className="week-day"
                         aria-label={`${e.name}, ${key}, ${own.length} shifts, ${sh.map((h) => h.code).join(" ") || "no SH"}, ${av.length ? "available" : "no availability"}`}
                         onClick={() =>
-                          setDetail({ employeeId: e.id, date: key })
+                          manager && av.length && !own.length && !sh.length
+                            ? onAvailability(e.id, key)
+                            : setDetail({ employeeId: e.id, date: key })
                         }
                       >
                         {own.length ? (
@@ -247,9 +293,12 @@ export default function MobileRota({
                               data-branch={branchTone[s.branch]}
                               className={`compact-shift ${s.status}`}
                             >
-                              {s.branch === "SOHO W" ? "SW" : s.branch}
+                              <b className="compact-time">{s.start}</b>
+                              <b className="compact-time">{s.end}</b>
                               <small>
-                                {s.status === "draft" ? "D" : "Live"}
+                                {s.branch === "SOHO W" ? "SW" : s.branch}
+                                {s.status === "draft" ? " D" : ""}
+                                {invalidIds.includes(s.id) ? " !" : ""}
                               </small>
                               {own.length > 1 && (
                                 <small>+{own.length - 1}</small>
@@ -294,6 +343,9 @@ export default function MobileRota({
           manager={manager}
           onShift={onShift}
           onHoliday={onHoliday}
+          onAvailability={onAvailability}
+          onEditAvailability={onEditAvailability}
+          invalidIds={invalidIds}
           onClose={() => setDetail(null)}
         />
       )}

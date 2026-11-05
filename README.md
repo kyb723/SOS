@@ -6,7 +6,7 @@ SOS 係一個適合手機使用嘅咖啡店排更 prototype。介面使用 Engli
 
 ## 開始使用（GitHub Codespaces）
 
-1. 喺 GitHub 開啟呢個 repository，揀包含 SOS prototype 嘅 branch（例如 `feat/sos-v3`）。
+1. 喺 GitHub 開啟呢個 repository，揀包含 SOS prototype 嘅 branch（例如 `feat/sos-v4`）。
 2. 按 **Code → Codespaces → Create codespace on [branch]**。
 3. 等 VS Code 開好，喺上方選單按 **Terminal → New Terminal**。
 4. 確認 terminal 已喺 repository 根目錄（見到 `package.json`），逐行輸入：
@@ -31,7 +31,7 @@ npm run dev
 ```bash
 git clone https://github.com/kyb723/SOS.git
 cd SOS
-git switch feat/sos-v3
+git switch feat/sos-v4
 npm install
 npm run dev
 ```
@@ -48,7 +48,7 @@ npm run dev
 - 左右滑動月曆睇晒成個月；員工名會固定喺左邊。
 - 用 Previous／Next month 切換月份，Today 返回今個月。
 - 揀 All Branches 或單一分店；分店卡顯示當月各分店可見班次數。
-- 喺 Availability inbox 嘅 **Preview as** 揀示範員工。
+- 按 Availability → View / edit complete availability history，再用 **Preview as** 揀示範員工。
 - 按 **+ Availability**，直接喺月曆點選多個日期，再點可取消，切換月份亦會保留選取。
 - 喺月曆直接點選一日或多日，再填 Earliest start／Latest finish，或者勾 All-day availability；揀一間或多間 preferred branches，最後按 **Submit availability**。
 - 員工只會見到自己嘅 availability；經理會見到全部。Availability 可以 Remove，並唔會自動變成班次。
@@ -58,7 +58,7 @@ npm run dev
 - 按右上 **Manager Demo**，再按 **Add shift**。
 - 揀員工、日期、分店、開始／完結時間同 Draft／Published。
 - 按月曆入面嘅班次可以修改或刪除。刪除前會要求確認。
-- **Publish N drafts** 會發佈目前月份同分店篩選內嘅 draft，唔會改動其他月份或分店。
+- **Publish Rota** 會先確認，再發佈目前月份所有分店嘅 valid draft；invalid drafts 會整批阻止。唔會改動其他月份。
 - 同一員工喺同一日嘅時間唔可以重疊，無論分店、draft 定 published 都會檢查。
 - 例如 Alex 已有 ST 08:00–16:00，新增 CSW 15:00–18:00 會被拒絕；16:00–18:00 則可以。
 - 呢版未支援跨午夜班次。結束時間必須遲過開始時間。
@@ -81,7 +81,7 @@ npm start
 ```
 
 - `lint`：檢查常見程式錯誤。
-- `test`：38 個 unit tests，涵蓋跨分店重疊、相連班次、修改、不同員工／日期、錯誤時間／日期、sample data 同 availability validation。
+- `test`：48 個 unit tests，涵蓋跨分店重疊、相連班次、修改、不同員工／日期、錯誤時間／日期、sample data 同 availability validation。
 - `build`：TypeScript 檢查同 production build。
 - `start`：先完成 build，然後啟動 production server。請先停止 `dev`，避免用緊同一個 port。
 - 有 lockfile 後，重現同一版本可用 `npm ci` 代替 `npm install`。
@@ -130,3 +130,7 @@ Staff 用 published shifts 計算；Manager 包含 drafts，Inbox 會清楚標�
 ## Version 3 更新
 
 Availability 已改成直接點選多日嘅月曆，手機 rota 改為七日顯示，並加入獨立 SH 紀錄。V3 會阻止同員工同日期嘅新 availability（即使時間／分店不同）；請選 Update existing 或取消重複日期。完整操作、SH 設定、wallet error 調查、browser tests 同 iPhone 預覽方式，見 [Version 3 說明](docs/VERSION_3.md)。
+
+## Version 4 更新
+
+主頁集中 rota，availability history 移到 Availability 管理視窗。Manager 可以直接由 Av 格建立工作更，新增／編輯／發佈都必須符合提交嘅分店同單一時間段。All-day 依照明確 prototype branch hours。手機格仔直接顯示時間，SH 按鈕移到頂部同一操作列，圖例最後只顯示 SH。全月 Publish Rota 有確認、跨全部分店驗證，以及 localStorage 儲存失敗保護。舊 invalid 更會保留並標示，唔會靜默刪除。詳細操作、規則、48 tests 同 iPhone 預覽方式見 [Version 4 說明](docs/VERSION_4.md)。

@@ -59,7 +59,7 @@ describe("availability history and status", () => {
   it("all-day still respects branches and dates", () => {
     expect(
       availabilityStatus({ ...a, allDay: true, dates: [s.date] }, [
-        { ...s, start: "06:00", end: "22:00" },
+        { ...s, start: "08:00", end: "20:00" },
       ]),
     ).toBe("Scheduled");
     expect(
