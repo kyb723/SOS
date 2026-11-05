@@ -1,3 +1,4 @@
+import { SH_CODES, FULL_TIME_EMPLOYEE_IDS } from "./rota-config";
 export const BRANCHES = ["ST", "CSW", "SOHO W"] as const;
 export type Branch = (typeof BRANCHES)[number];
 export type Employee = { id: string; name: string; role: string };
@@ -22,6 +23,7 @@ export type Availability = {
 };
 export type DemoData = {
   version: 1;
+  shItems?: StatutoryHoliday[];
   shifts: Shift[];
   availability: Availability[];
 };
@@ -55,7 +57,17 @@ export function shiftsOverlap(a: Shift, b: Shift) {
     b.start < a.end
   );
 }
-export function validateShift(shift: Shift, shifts: Shift[]): string | null {
+export function validateShift(
+  shift: Shift,
+  shifts: Shift[],
+  shItems: StatutoryHoliday[] = [],
+): string | null {
+  if (
+    shItems.some(
+      (h) => h.employeeId === shift.employeeId && h.date === shift.date,
+    )
+  )
+    return "This date already has an SH item. Remove or move it before scheduling work.";
   if (!employees.some((e) => e.id === shift.employeeId))
     return "Choose a team member.";
   if (!validDate(shift.date)) return "Choose a valid shift date.";
@@ -207,20 +219,88 @@ export function validateAvailabilitySubmission(
   if (error) return error;
   if (new Set(a.dates).size !== a.dates.length)
     return "Remove duplicate dates.";
-  const samePreferences = (b: Availability) =>
-    a.allDay === b.allDay &&
-    (a.allDay || (a.start === b.start && a.end === b.end)) &&
-    [...new Set(a.branches)].sort().join("|") ===
-      [...new Set(b.branches)].sort().join("|");
+  if (conflictingAvailability(a, records).length)
+    return "Availability already exists for one or more selected dates. Update an existing submission or deselect those dates.";
+  return null;
+}
+
+export type StatutoryHoliday = {
+  id: string;
+  employeeId: string;
+  date: string;
+  branch: Branch;
+  code: string;
+  status: "draft" | "published";
+};
+export function toggleDate(dates: string[], date: string) {
+  return dates.includes(date)
+    ? dates.filter((d) => d !== date)
+    : [...dates, date].sort();
+}
+export function calendarDays(month: Date) {
+  const start = new Date(month.getFullYear(), month.getMonth(), 1);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  return Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+}
+export function weekDays(date: Date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+}
+export function conflictingAvailability(
+  a: Availability,
+  records: Availability[],
+) {
+  return records.filter(
+    (b) =>
+      b.id !== a.id &&
+      b.employeeId === a.employeeId &&
+      b.dates.some((d) => a.dates.includes(d)),
+  );
+}
+export function validateHoliday(
+  h: StatutoryHoliday,
+  items: StatutoryHoliday[],
+  shifts: Shift[],
+  codes: readonly string[] = SH_CODES,
+) {
+  if (!FULL_TIME_EMPLOYEE_IDS.includes(h.employeeId))
+    return "Choose a full-time employee.";
   if (
-    records.some(
-      (b) =>
-        b.id !== a.id &&
-        b.employeeId === a.employeeId &&
-        samePreferences(b) &&
-        b.dates.some((d) => a.dates.includes(d)),
+    !validDate(h.date) ||
+    !BRANCHES.includes(h.branch) ||
+    !codes.includes(h.code) ||
+    !["draft", "published"].includes(h.status)
+  )
+    return "Choose a valid date, branch, SH code and status.";
+  if (
+    items.some(
+      (x) =>
+        x.id !== h.id && x.employeeId === h.employeeId && x.date === h.date,
     )
   )
-    return "An identical availability entry already exists for one of these dates. Edit the existing submission instead.";
+    return "An SH item already exists for this employee on this date.";
+  if (shifts.some((s) => s.employeeId === h.employeeId && s.date === h.date))
+    return "SH is an all-day record and cannot share a date with a working shift.";
   return null;
+}
+
+export function filterHolidays(
+  items: StatutoryHoliday[],
+  branch: Branch | "All",
+  manager: boolean,
+) {
+  return items.filter(
+    (h) =>
+      (manager || h.status === "published") &&
+      (branch === "All" || h.branch === branch),
+  );
 }

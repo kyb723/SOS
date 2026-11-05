@@ -90,11 +90,11 @@ describe("availability history and status", () => {
         { ...a, id: "new", dates: ["2026-11-10"], branches: ["CSW", "ST"] },
         [a],
       ),
-    ).toMatch(/identical/);
+    ).toMatch(/already exists/);
     expect(validateAvailabilitySubmission(a, [a])).toBeNull();
     expect(
       validateAvailabilitySubmission({ ...a, id: "new", start: "10:00" }, [a]),
-    ).toBeNull();
+    ).toMatch(/already exists/);
     expect(
       validateAvailabilitySubmission({ ...a, dates: [s.date, s.date] }, []),
     ).toMatch(/duplicate dates/);
@@ -105,7 +105,7 @@ describe("availability history and status", () => {
         { ...a, id: "new", allDay: true, start: "" },
         [{ ...a, allDay: true }],
       ),
-    ).toMatch(/identical/));
+    ).toMatch(/already exists/));
 });
 describe("monthly scheduled hours and visibility", () => {
   const shifts = [

@@ -8,7 +8,8 @@
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint .",
     "test": "vitest run",
-    "format": "prettier --write src tests README.md *.json *.mjs"
+    "format": "prettier --write src tests README.md *.json *.mjs",
+    "test:browser": "node scripts/browser-check.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -23,6 +24,7 @@
     "@types/react-dom": "^19.2.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.0.1",
+    "playwright": "^1.64.1",
     "prettier": "^3.9.10",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.9.0",

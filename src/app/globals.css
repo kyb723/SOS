@@ -1334,3 +1334,292 @@ select[data-branch] {
     min-height: 44px;
   }
 }
+
+/* V3: touch calendar, weekly mobile rota and non-working holiday records. */
+:root {
+  --sh-fill: #203b43;
+  --sh-ink: #b7e1ed;
+  --sh-line: #628e9d;
+}
+.sh-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 22px 16px;
+  color: var(--muted);
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+.sh-item,
+.compact-sh {
+  background: var(--sh-fill);
+  color: var(--sh-ink);
+  border: 1px solid var(--sh-line);
+  border-radius: 5px;
+  padding: 9px;
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+  display: block;
+  margin: 3px 0;
+}
+.sh-item small {
+  display: block;
+  font-size: 10px;
+}
+.sh-draft {
+  border-style: dashed;
+  border-width: 2px;
+}
+.sh-key {
+  background: var(--sh-fill);
+  border: 1px solid var(--sh-line);
+}
+.date-calendar {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 14px;
+}
+.calendar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.calendar-heading h3 {
+  font-size: 15px;
+  font-weight: 500;
+}
+.calendar-heading button,
+.week-navigation button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--raised);
+  font-size: 22px;
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+.calendar-weekday {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 5px 0;
+}
+.calendar-grid button {
+  min-width: 0;
+  min-height: 42px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.calendar-grid button.outside-month {
+  color: var(--muted);
+  background: #131615;
+}
+.calendar-grid button[aria-current="date"] {
+  border-color: var(--green);
+}
+.calendar-grid button.selected-date {
+  background: var(--green);
+  color: #1d301a;
+  font-weight: 600;
+}
+.date-calendar > p {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 12px;
+}
+.warning .subtle {
+  white-space: normal;
+  text-align: left;
+  margin-top: 8px;
+}
+.date-chips {
+  max-height: 96px;
+  overflow: auto;
+}
+.mobile-rota {
+  display: none;
+}
+.day-subtitle {
+  display: block;
+  font-size: 14px;
+  margin-top: 8px;
+}
+.mobile-help {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 8px 12px;
+}
+.week-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  padding: 12px;
+}
+.week-navigation strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+body:has(dialog[open]) {
+  overflow: hidden;
+}
+dialog {
+  max-height: calc(
+    100dvh - max(16px, env(safe-area-inset-top)) -
+      max(16px, env(safe-area-inset-bottom))
+  );
+  overscroll-behavior: contain;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  scroll-padding-bottom: 90px;
+}
+dialog .dialog-actions {
+  position: sticky;
+  bottom: calc(-1 * max(20px, env(safe-area-inset-bottom)));
+  background: var(--surface);
+  padding: 14px 0 max(14px, env(safe-area-inset-bottom));
+  z-index: 4;
+}
+.icon-button {
+  min-width: 44px;
+  min-height: 44px;
+}
+@media (max-width: 760px) {
+  .desktop-rota {
+    display: none;
+  }
+  .mobile-rota {
+    display: block;
+    border-top: 1px solid var(--border);
+  }
+  .scroll-hint {
+    display: none;
+  }
+  .mode-switch button {
+    min-height: 44px;
+  }
+  .month-switch button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .sh-toolbar {
+    padding: 0 14px 14px;
+  }
+  .calendar-grid {
+    gap: 2px;
+  }
+  .date-calendar {
+    padding: 6px;
+  }
+  .calendar-grid button {
+    min-height: 40px;
+  }
+  .week-table {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .week-table th,
+  .week-table td {
+    position: static;
+    min-width: 0;
+    width: auto;
+    padding: 0;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .week-table th:first-child {
+    width: 74px;
+    text-align: left;
+    padding: 7px;
+    font-size: 12px;
+  }
+  .week-table th:first-child > span {
+    display: block;
+    font-size: 11px;
+    margin: 4px 0;
+  }
+  .week-table th:first-child > small {
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+  .week-table thead th {
+    height: 52px;
+    font-size: 12px;
+  }
+  .week-table thead th[aria-current="date"] {
+    color: var(--green);
+  }
+  .week-table td {
+    height: 76px;
+    text-align: center;
+  }
+  .week-day {
+    border: 0;
+    background: transparent;
+    width: 100%;
+    min-height: 76px;
+    padding: 2px;
+    font-size: 12px;
+    display: block;
+  }
+  .compact-shift,
+  .compact-sh {
+    display: block;
+    padding: 7px 0;
+    border-radius: 4px;
+    background: var(--branch-fill);
+    color: var(--branch-ink);
+    border: 1px solid var(--branch-line);
+    font-size: 11px;
+    line-height: 1.5;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  .compact-shift.draft {
+    border-style: dashed;
+    border-width: 2px;
+  }
+  .compact-sh {
+    background: var(--sh-fill);
+    color: var(--sh-ink);
+    border-color: var(--sh-line);
+    font-size: 11px;
+  }
+  .compact-shift small,
+  .compact-sh small {
+    display: block;
+    font-size: 10px;
+  }
+  .compact-available {
+    font-size: 11px;
+    color: var(--green);
+    border-bottom: 1px dashed var(--muted);
+  }
+  .compact-off {
+    color: var(--muted);
+  }
+  .week-table thead th > span {
+    font-size: 11px;
+  }
+  .rota-footer {
+    gap: 12px;
+  }
+  .week-day:focus-visible {
+    outline-offset: -3px;
+  }
+}

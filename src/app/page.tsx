@@ -30,10 +30,18 @@ import {
   availabilityWarning,
   validateAvailabilitySubmission,
   validateShift,
+  StatutoryHoliday,
+  conflictingAvailability,
+  filterHolidays,
 } from "@/lib/scheduling";
 import { localScheduleRepository } from "@/lib/storage";
 
 import AvailabilityInbox from "./availability-inbox";
+
+import AvailabilityCalendar from "./availability-calendar";
+import MobileRota from "./mobile-rota";
+import HolidayEditor from "./holiday-editor";
+import { SH_CODES } from "@/lib/rota-config";
 
 type Editor = "shift" | "availability" | null;
 const blankShift = (date: string): Shift => ({
@@ -60,6 +68,7 @@ export default function Home() {
     shifts: [],
     availability: [],
   });
+  const [weekReset, setWeekReset] = useState(0);
   const [ready, setReady] = useState(false);
   const [manager, setManager] = useState(false);
   const [employee, setEmployee] = useState(employees[0].id);
@@ -74,7 +83,7 @@ export default function Home() {
   const [availability, setAvailability] = useState<Availability>(() =>
     blankAvailability(employees[0].id),
   );
-  const [date, setDate] = useState(dateKey(new Date()));
+  const [holiday, setHoliday] = useState<StatutoryHoliday | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [storageWarning, setStorageWarning] = useState("");
@@ -95,13 +104,15 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, []);
   useEffect(() => {
-    if (editor && dialog.current && !dialog.current.open)
-      dialog.current.showModal();
+    if (editor && dialog.current) {
+      if (!dialog.current.open) dialog.current.showModal();
+      dialog.current.scrollTop = 0;
+    }
     if (!editor && dialog.current?.open) {
       dialog.current.close();
       trigger.current?.focus();
     }
-  }, [editor]);
+  }, [editor, availability.id]);
   const save = (next: DemoData, message: string) => {
     setData(next);
     try {
@@ -124,7 +135,6 @@ export default function Home() {
     if (kind === "shift") setShift(existing ?? blankShift(dateKey(month)));
     else {
       setAvailability(blankAvailability(employee));
-      setDate(dateKey(month));
     }
     setEditor(kind);
   };
@@ -147,10 +157,18 @@ export default function Home() {
     if (!manager && a.employeeId !== employee) return;
     trigger.current = document.activeElement as HTMLElement;
     setAvailability({ ...a, dates: [...a.dates], branches: [...a.branches] });
-    setDate(a.dates[0]);
+
     setError("");
     setEditor("availability");
   };
+  const shItems = data.shItems ?? [];
+  const shownSH = filterHolidays(shItems, branch, manager);
+  const monthlySH = shownSH.filter((h) => h.date.startsWith(prefix));
+  const draftSH = monthlySH.filter((h) => h.status === "draft");
+  const availabilityConflicts = conflictingAvailability(
+    availability,
+    data.availability,
+  );
   const drafts = visible.filter((s) => s.status === "draft");
   const monthTitle = month.toLocaleDateString("en-GB", {
     month: "long",
@@ -166,14 +184,24 @@ export default function Home() {
         ? { ...s, status: "published" as const }
         : s,
     );
-    const issue = next.map((s) => validateShift(s, next)).find(Boolean);
+    const issue = next
+      .map((s) => validateShift(s, next, shItems))
+      .find(Boolean);
     if (issue) {
       setNotice(issue);
       return;
     }
     save(
-      { ...data, shifts: next },
-      `${drafts.length} shifts published for ${branch === "All" ? "all branches" : branch}.`,
+      {
+        ...data,
+        shifts: next,
+        shItems: shItems.map((h) =>
+          draftSH.some((d) => d.id === h.id)
+            ? { ...h, status: "published" as const }
+            : h,
+        ),
+      },
+      `${drafts.length + draftSH.length} rota items published for ${branch === "All" ? "all branches" : branch}.`,
     );
   };
   return (
@@ -224,6 +252,7 @@ export default function Home() {
               className={!manager ? "selected" : ""}
               onClick={() => {
                 setManager(false);
+                setHoliday(null);
                 close();
               }}
             >
@@ -234,6 +263,7 @@ export default function Home() {
               className={manager ? "selected" : ""}
               onClick={() => {
                 setManager(true);
+                setHoliday(null);
                 close();
               }}
             >
@@ -343,6 +373,26 @@ export default function Home() {
                 )}
               </div>
             </div>
+            {manager && (
+              <div className="sh-toolbar">
+                <button
+                  className="subtle"
+                  onClick={() =>
+                    setHoliday({
+                      id: "",
+                      employeeId: "alex",
+                      date: dateKey(month),
+                      branch: branch === "All" ? "ST" : branch,
+                      code: SH_CODES[0],
+                      status: "draft",
+                    })
+                  }
+                >
+                  + SH item
+                </button>
+                <span>Full-time statutory holiday recording</span>
+              </div>
+            )}
             <div className="rota-toolbar">
               <div className="month-switch">
                 <button
@@ -368,15 +418,16 @@ export default function Home() {
                 </button>
                 <button
                   className="today"
-                  onClick={() =>
+                  onClick={() => {
                     setMonth(
                       new Date(
                         new Date().getFullYear(),
                         new Date().getMonth(),
                         1,
                       ),
-                    )
-                  }
+                    );
+                    setWeekReset((n) => n + 1);
+                  }}
                 >
                   Today
                 </button>
@@ -413,10 +464,11 @@ export default function Home() {
               {manager && (
                 <button
                   className="publish"
-                  disabled={!drafts.length}
+                  disabled={!drafts.length && !draftSH.length}
                   onClick={publish}
                 >
-                  <Check size={15} /> Publish {drafts.length} drafts
+                  <Check size={15} /> Publish {drafts.length + draftSH.length}{" "}
+                  drafts
                 </button>
               )}
             </div>
@@ -424,8 +476,23 @@ export default function Home() {
               Swipe or scroll sideways to see the full month.
               {manager ? " Select a shift to edit." : ""}
             </p>
+            <MobileRota
+              key={prefix + String(manager) + weekReset}
+              month={month}
+              shifts={data.shifts.filter(
+                (s) =>
+                  (manager || s.status === "published") &&
+                  (branch === "All" || s.branch === branch),
+              )}
+              monthlyShifts={visible}
+              holidays={shownSH}
+              availability={visibleAvailability}
+              manager={manager}
+              onShift={(s) => open("shift", s)}
+              onHoliday={setHoliday}
+            />
             <div
-              className="table-scroll"
+              className="table-scroll desktop-rota"
               tabIndex={0}
               role="region"
               aria-label="Scrollable monthly team rota"
@@ -508,6 +575,30 @@ export default function Home() {
                             key={key}
                             className={`${[0, 6].includes(d.getDay()) ? "weekend" : ""} ${key === dateKey(new Date()) ? "current-day" : ""}`}
                           >
+                            {monthlySH
+                              .filter(
+                                (h) => h.employeeId === e.id && h.date === key,
+                              )
+                              .map((h) =>
+                                manager ? (
+                                  <button
+                                    key={h.id}
+                                    className={`sh-item sh-${h.status}`}
+                                    onClick={() => setHoliday(h)}
+                                    aria-label={`Edit ${h.code} for ${e.name} on ${key}`}
+                                  >
+                                    {h.code}
+                                    <small>
+                                      {h.branch} · {h.status}
+                                    </small>
+                                  </button>
+                                ) : (
+                                  <div className="sh-item" key={h.id}>
+                                    {h.code}
+                                    <small>{h.branch} · published</small>
+                                  </div>
+                                ),
+                              )}
                             {shifts.map((s) =>
                               manager ? (
                                 <button
@@ -563,11 +654,15 @@ export default function Home() {
                                 ))}
                               </div>
                             )}
-                            {!shifts.length && !available.length && (
-                              <span className="off">
-                                OFF<small>No shift in this view</small>
-                              </span>
-                            )}
+                            {!shifts.length &&
+                              !available.length &&
+                              !monthlySH.some(
+                                (h) => h.employeeId === e.id && h.date === key,
+                              ) && (
+                                <span className="off">
+                                  OFF<small>No shift in this view</small>
+                                </span>
+                              )}
                           </td>
                         );
                       })}
@@ -578,6 +673,9 @@ export default function Home() {
             </div>
             <div className="rota-footer">
               <div className="legend">
+                <span>
+                  <i className="sh-key" /> SH · zero hours
+                </span>
                 {BRANCHES.map((b) => (
                   <span
                     className="branch-badge"
@@ -658,6 +756,32 @@ export default function Home() {
           </footer>
         </main>
       </div>
+      {manager && holiday && (
+        <HolidayEditor
+          key={holiday.id || "new"}
+          item={holiday}
+          items={shItems}
+          shifts={data.shifts}
+          onClose={() => setHoliday(null)}
+          onSave={(h) => {
+            save(
+              {
+                ...data,
+                shItems: [...shItems.filter((x) => x.id !== h.id), h],
+              },
+              "SH item saved. It adds zero working hours.",
+            );
+            setHoliday(null);
+          }}
+          onDelete={(id) => {
+            save(
+              { ...data, shItems: shItems.filter((h) => h.id !== id) },
+              "SH item deleted.",
+            );
+            setHoliday(null);
+          }}
+        />
+      )}
       <dialog
         ref={dialog}
         onCancel={(e) => {
@@ -695,7 +819,7 @@ export default function Home() {
             onSubmit={(e) => {
               e.preventDefault();
               if (!manager) return;
-              const issue = validateShift(shift, data.shifts);
+              const issue = validateShift(shift, data.shifts, shItems);
               if (issue) {
                 setError(issue);
                 return;
@@ -893,35 +1017,38 @@ export default function Home() {
                 ))}
               </select>
             </label>
-            <label htmlFor="available-date">Choose dates</label>
-            <div className="date-add">
-              <input
-                id="available-date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-              <button
-                type="button"
-                className="subtle"
-                onClick={() => {
-                  if (!date) {
-                    setError("Choose a date to add.");
-                    return;
-                  }
-                  setAvailability({
-                    ...availability,
-                    dates: [...new Set([...availability.dates, date])].sort(),
-                  });
-                  setError("");
-                }}
-              >
-                Add date
-              </button>
-            </div>
-            <p className="form-help">
-              Add one or more dates below before submitting.
-            </p>
+            <AvailabilityCalendar
+              key={availability.id || "new"}
+              initialMonth={
+                availability.dates[0]
+                  ? new Date(availability.dates[0] + "T12:00:00")
+                  : month
+              }
+              dates={availability.dates}
+              onChange={(dates) => {
+                setAvailability({ ...availability, dates });
+                setError("");
+              }}
+            />
+            {availabilityConflicts.length > 0 && (
+              <div className="warning" role="alert">
+                <p>
+                  Selected dates already have submissions. Deselect those dates,
+                  or choose a submission below to edit its original dates and
+                  preferences. Nothing is overwritten.
+                </p>
+                {availabilityConflicts.map((a) => (
+                  <button
+                    type="button"
+                    className="subtle"
+                    key={a.id}
+                    onClick={() => editAvailability(a)}
+                  >
+                    Update existing: {a.dates.join(", ")}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="date-chips">
               {availability.dates.map((d) => (
                 <button
@@ -1027,7 +1154,16 @@ export default function Home() {
               <button type="button" className="subtle" onClick={close}>
                 Cancel
               </button>
-              <button type="submit" className="primary">
+              <button
+                type="submit"
+                disabled={
+                  !!validateAvailabilitySubmission(
+                    availability,
+                    data.availability,
+                  )
+                }
+                className="primary"
+              >
                 Submit availability
               </button>
             </div>

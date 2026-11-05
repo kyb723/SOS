@@ -6,7 +6,7 @@ SOS 係一個適合手機使用嘅咖啡店排更 prototype。介面使用 Engli
 
 ## 開始使用（GitHub Codespaces）
 
-1. 喺 GitHub 開啟呢個 repository，揀包含 SOS prototype 嘅 branch（例如 `feat/sos-v2`）。
+1. 喺 GitHub 開啟呢個 repository，揀包含 SOS prototype 嘅 branch（例如 `feat/sos-v3`）。
 2. 按 **Code → Codespaces → Create codespace on [branch]**。
 3. 等 VS Code 開好，喺上方選單按 **Terminal → New Terminal**。
 4. 確認 terminal 已喺 repository 根目錄（見到 `package.json`），逐行輸入：
@@ -31,7 +31,7 @@ npm run dev
 ```bash
 git clone https://github.com/kyb723/SOS.git
 cd SOS
-git switch feat/sos-v2
+git switch feat/sos-v3
 npm install
 npm run dev
 ```
@@ -49,8 +49,8 @@ npm run dev
 - 用 Previous／Next month 切換月份，Today 返回今個月。
 - 揀 All Branches 或單一分店；分店卡顯示當月各分店可見班次數。
 - 喺 Availability inbox 嘅 **Preview as** 揀示範員工。
-- 按 **+ Availability**，揀日期後按 **Add date**。可重複加入多個日期，亦可以移除日期。
-- 填 Earliest start／Latest finish，或者勾 All-day availability；揀一間或多間 preferred branches，最後按 **Submit availability**。
+- 按 **+ Availability**，直接喺月曆點選多個日期，再點可取消，切換月份亦會保留選取。
+- 喺月曆直接點選一日或多日，再填 Earliest start／Latest finish，或者勾 All-day availability；揀一間或多間 preferred branches，最後按 **Submit availability**。
 - 員工只會見到自己嘅 availability；經理會見到全部。Availability 可以 Remove，並唔會自動變成班次。
 
 ### Manager Demo
@@ -81,7 +81,7 @@ npm start
 ```
 
 - `lint`：檢查常見程式錯誤。
-- `test`：25 個 unit tests，涵蓋跨分店重疊、相連班次、修改、不同員工／日期、錯誤時間／日期、sample data 同 availability validation。
+- `test`：38 個 unit tests，涵蓋跨分店重疊、相連班次、修改、不同員工／日期、錯誤時間／日期、sample data 同 availability validation。
 - `build`：TypeScript 檢查同 production build。
 - `start`：先完成 build，然後啟動 production server。請先停止 `dev`，避免用緊同一個 port。
 - 有 lockfile 後，重現同一版本可用 `npm ci` 代替 `npm install`。
@@ -126,3 +126,7 @@ tests/scheduling.test.ts
 Staff 用 published shifts 計算；Manager 包含 drafts，Inbox 會清楚標示。唔代表必須排滿整段 availability，亦唔代表最低人手已足夠。刪更後會重算狀態，提交紀錄仍保留。
 
 沿用 `sos.demo.v1` 同 version 1 schema；只新增 backwards-compatible optional `submittedAt`。唔使 reset 舊資料。詳細驗證見 `docs/VERSION_2.md`。
+
+## Version 3 更新
+
+Availability 已改成直接點選多日嘅月曆，手機 rota 改為七日顯示，並加入獨立 SH 紀錄。V3 會阻止同員工同日期嘅新 availability（即使時間／分店不同）；請選 Update existing 或取消重複日期。完整操作、SH 設定、wallet error 調查、browser tests 同 iPhone 預覽方式，見 [Version 3 說明](docs/VERSION_3.md)。

@@ -3,6 +3,7 @@ import {
   makeSeed,
   validateAvailability,
   validateShift,
+  validateHoliday,
 } from "./scheduling";
 // Replace this adapter with a Supabase repository later; keep domain validation shared.
 export interface ScheduleRepository {
@@ -35,6 +36,17 @@ export const localScheduleRepository: ScheduleRepository = {
       )
     )
       throw new Error("Invalid demo records");
+    if (
+      data.shItems !== undefined &&
+      (!Array.isArray(data.shItems) ||
+        data.shItems.some(
+          (h) =>
+            !h ||
+            typeof h.id !== "string" ||
+            validateHoliday(h, data.shItems ?? [], data.shifts),
+        ))
+    )
+      throw new Error("Invalid SH records");
     return data;
   },
   save(data) {
