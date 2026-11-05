@@ -4,7 +4,9 @@ import {
   Availability,
   branchTone,
   dateKey,
-  employees,
+  businessToday,
+  employees as demoEmployees,
+  Employee,
   employeeHours,
   formatHours,
   Shift,
@@ -24,6 +26,8 @@ function DayDetails({
   onAvailability,
   onEditAvailability,
   invalidIds,
+  team = demoEmployees,
+  canEditAvailability,
 }: {
   employeeId: string;
   date: string;
@@ -37,7 +41,10 @@ function DayDetails({
   onAvailability: (id: string, date: string) => void;
   onEditAvailability: (a: Availability) => void;
   invalidIds: string[];
+  team?: Employee[];
+  canEditAvailability?: (a: Availability) => boolean;
 }) {
+  const employees = team;
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement;
@@ -131,15 +138,17 @@ function DayDetails({
                 ? "All day (branch opening hours)"
                 : `${a.start}–${a.end}`}{" "}
               · {a.branches.join(" / ")}
-              <button
-                className="subtle"
-                onClick={() => {
-                  onClose();
-                  onEditAvailability(a);
-                }}
-              >
-                Review / edit submission
-              </button>
+              {(!canEditAvailability || canEditAvailability(a)) && (
+                <button
+                  className="subtle"
+                  onClick={() => {
+                    onClose();
+                    onEditAvailability(a);
+                  }}
+                >
+                  Review / edit submission
+                </button>
+              )}
             </div>
           ))}
           {manager && (
@@ -176,6 +185,8 @@ export default function MobileRota({
   onAvailability,
   onEditAvailability,
   invalidIds,
+  team = demoEmployees,
+  canEditAvailability,
 }: {
   month: Date;
   shifts: Shift[];
@@ -188,9 +199,12 @@ export default function MobileRota({
   onAvailability: (id: string, date: string) => void;
   onEditAvailability: (a: Availability) => void;
   invalidIds: string[];
+  team?: Employee[];
+  canEditAvailability?: (a: Availability) => boolean;
 }) {
+  const employees = team;
   const [anchor, setAnchor] = useState(() => {
-    const now = new Date();
+    const now = businessToday();
     return now.getFullYear() === month.getFullYear() &&
       now.getMonth() === month.getMonth()
       ? now
@@ -241,7 +255,7 @@ export default function MobileRota({
                 scope="col"
                 key={dateKey(d)}
                 aria-current={
-                  dateKey(d) === dateKey(new Date()) ? "date" : undefined
+                  dateKey(d) === dateKey(businessToday()) ? "date" : undefined
                 }
               >
                 <span>
@@ -346,6 +360,8 @@ export default function MobileRota({
           onAvailability={onAvailability}
           onEditAvailability={onEditAvailability}
           invalidIds={invalidIds}
+          team={team}
+          canEditAvailability={canEditAvailability}
           onClose={() => setDetail(null)}
         />
       )}

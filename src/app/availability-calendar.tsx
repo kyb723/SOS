@@ -1,6 +1,11 @@
 "use client";
 import { useState } from "react";
-import { calendarDays, dateKey, toggleDate } from "@/lib/scheduling";
+import {
+  calendarDays,
+  dateKey,
+  toggleDate,
+  businessToday,
+} from "@/lib/scheduling";
 export default function AvailabilityCalendar({
   dates,
   onChange,
@@ -53,7 +58,9 @@ export default function AvailabilityCalendar({
               key={key}
               aria-label={`Select ${key}`}
               aria-pressed={dates.includes(key)}
-              aria-current={key === dateKey(new Date()) ? "date" : undefined}
+              aria-current={
+                key === dateKey(businessToday()) ? "date" : undefined
+              }
               className={`${d.getMonth() !== month.getMonth() ? "outside-month" : ""} ${dates.includes(key) ? "selected-date" : ""}`}
               onClick={() => onChange(toggleDate(dates, key))}
               onKeyDown={(e) => {

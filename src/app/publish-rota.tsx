@@ -1,20 +1,34 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { DemoData, planMonthlyPublication } from "@/lib/scheduling";
+import {
+  DemoData,
+  Employee,
+  OperatingHours,
+  employees,
+  planMonthlyPublication,
+} from "@/lib/scheduling";
 export default function PublishRota({
+  shared = false,
+  team = employees,
+  operatingHours,
+  codes,
   data,
   month,
   onPublish,
   onClose,
 }: {
+  shared?: boolean;
+  operatingHours?: OperatingHours;
+  codes?: readonly string[];
+  team?: Employee[];
   data: DemoData;
   month: string;
-  onPublish: (data: DemoData) => boolean;
+  onPublish: (data: DemoData) => Promise<boolean>;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState("");
-  const plan = planMonthlyPublication(data, month);
+  const plan = planMonthlyPublication(data, month, team, operatingHours, codes);
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement;
     ref.current?.showModal();
@@ -66,13 +80,21 @@ export default function PublishRota({
         <button
           className="primary"
           disabled={!!plan.errors.length || !plan.count}
-          onClick={() => {
-            const latest = planMonthlyPublication(data, month);
+          onClick={async () => {
+            const latest = planMonthlyPublication(
+              data,
+              month,
+              team,
+              operatingHours,
+              codes,
+            );
             if (latest.errors.length) return;
-            if (onPublish(latest.data)) onClose();
+            if (await onPublish(latest.data)) onClose();
             else
               setError(
-                "Nothing was published. Browser storage could not save the complete rota. Try again after resolving storage access.",
+                shared
+                  ? "Publication could not be confirmed. Synchronise before retrying."
+                  : "Nothing was published. Browser storage could not save the complete rota. Try again after resolving storage access.",
               );
           }}
         >

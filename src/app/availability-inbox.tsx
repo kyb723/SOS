@@ -4,10 +4,16 @@ import {
   Availability,
   availabilityStatus,
   branchTone,
-  employees,
+  employees as demoEmployees,
+  Employee,
+  OperatingHours,
   Shift,
 } from "@/lib/scheduling";
 type Props = {
+  operatingHours?: OperatingHours;
+  team?: Employee[];
+  canEdit?: (a: Availability) => boolean;
+  shared?: boolean;
   records: Availability[];
   shifts: Shift[];
   manager: boolean;
@@ -17,6 +23,10 @@ type Props = {
   onRemove: (a: Availability) => void;
 };
 export default function AvailabilityInbox({
+  team = demoEmployees,
+  operatingHours,
+  canEdit,
+  shared = false,
   records,
   shifts,
   manager,
@@ -25,10 +35,11 @@ export default function AvailabilityInbox({
   onEdit,
   onRemove,
 }: Props) {
+  const employees = team;
   const [person, setPerson] = useState("All");
   const [month, setMonth] = useState("");
   const own = records.filter((a) =>
-    manager
+    manager || shared
       ? person === "All" || a.employeeId === person
       : a.employeeId === employee,
   );
@@ -45,15 +56,17 @@ export default function AvailabilityInbox({
       </div>
       <div className="inbox-filters">
         <label>
-          {manager ? "Team member" : "Preview as"}
+          {manager || shared ? "Team member" : "Preview as"}
           <select
-            aria-label={manager ? "Inbox employee" : "Preview as"}
-            value={manager ? person : employee}
+            aria-label={manager || shared ? "Inbox employee" : "Preview as"}
+            value={manager || shared ? person : employee}
             onChange={(e) =>
-              manager ? setPerson(e.target.value) : onEmployee(e.target.value)
+              manager || shared
+                ? setPerson(e.target.value)
+                : onEmployee(e.target.value)
             }
           >
-            {manager && <option value="All">All employees</option>}
+            {(manager || shared) && <option value="All">All employees</option>}
             {employees.map((e) => (
               <option key={e.id} value={e.id}>
                 {e.name}
@@ -95,7 +108,7 @@ export default function AvailabilityInbox({
                   {employees.find((e) => e.id === a.employeeId)?.name}
                 </strong>
                 <span className="schedule-status">
-                  {availabilityStatus(a, shifts)}
+                  {availabilityStatus(a, shifts, operatingHours)}
                 </span>
                 <p>
                   Submitted:{" "}
@@ -121,22 +134,24 @@ export default function AvailabilityInbox({
                   ))}
                 </div>
               </div>
-              <div className="request-actions">
-                <button
-                  className="text-button"
-                  onClick={() => onEdit(a)}
-                  aria-label={`Edit availability ${a.id}`}
-                >
-                  Edit
-                </button>
-                <button
-                  className="text-button"
-                  onClick={() => onRemove(a)}
-                  aria-label={`Remove availability ${a.id}`}
-                >
-                  Remove
-                </button>
-              </div>
+              {(!canEdit || canEdit(a)) && (
+                <div className="request-actions">
+                  <button
+                    className="text-button"
+                    onClick={() => onEdit(a)}
+                    aria-label={`Edit availability ${a.id}`}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="text-button"
+                    onClick={() => onRemove(a)}
+                    aria-label={`Remove availability ${a.id}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
             </article>
           ))}
         </div>

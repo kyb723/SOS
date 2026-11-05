@@ -4,8 +4,14 @@ import {
   BRANCH_OPERATING_HOURS,
 } from "./rota-config";
 export const BRANCHES = ["ST", "CSW", "SOHO W"] as const;
+export type OperatingHours = Record<Branch, { start: string; end: string }>;
 export type Branch = (typeof BRANCHES)[number];
-export type Employee = { id: string; name: string; role: string };
+export type Employee = {
+  id: string;
+  name: string;
+  role: string;
+  employmentType?: "full-time" | "part-time";
+};
 export type Shift = {
   id: string;
   employeeId: string;
@@ -39,6 +45,17 @@ export const employees: Employee[] = [
   { id: "casey", name: "Casey Lam", role: "Service crew" },
   { id: "taylor", name: "Taylor Cheung", role: "Service crew" },
 ];
+export function businessToday() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Hong_Kong",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const part = (name: string) =>
+    Number(parts.find((p) => p.type === name)?.value);
+  return new Date(part("year"), part("month") - 1, part("day"), 12);
+}
 export function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -65,6 +82,7 @@ export function validateShift(
   shift: Shift,
   shifts: Shift[],
   shItems: StatutoryHoliday[] = [],
+  team: Employee[] = employees,
 ): string | null {
   if (
     shItems.some(
@@ -72,7 +90,7 @@ export function validateShift(
     )
   )
     return "This date already has an SH item. Remove or move it before scheduling work.";
-  if (!employees.some((e) => e.id === shift.employeeId))
+  if (!team.some((e) => e.id === shift.employeeId))
     return "Choose a team member.";
   if (!validDate(shift.date)) return "Choose a valid shift date.";
   if (!BRANCHES.includes(shift.branch)) return "Choose a branch.";
@@ -90,9 +108,11 @@ export function validateShift(
     return "This team member already has an overlapping shift. Check all branches, including drafts.";
   return null;
 }
-export function validateAvailability(a: Availability): string | null {
-  if (!employees.some((e) => e.id === a.employeeId))
-    return "Choose a team member.";
+export function validateAvailability(
+  a: Availability,
+  team: Employee[] = employees,
+): string | null {
+  if (!team.some((e) => e.id === a.employeeId)) return "Choose a team member.";
   if (!a.dates.length || a.dates.some((d) => !validDate(d)))
     return "Choose at least one valid date.";
   if (!a.branches.length || a.branches.some((b) => !BRANCHES.includes(b)))
@@ -104,7 +124,7 @@ export function validateAvailability(a: Availability): string | null {
     return "Latest finish must be after earliest start.";
   return null;
 }
-export function makeSeed(now = new Date()): DemoData {
+export function makeSeed(now = businessToday()): DemoData {
   const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const shifts: Shift[] = [];
   employees.forEach((e, i) => {
@@ -175,14 +195,19 @@ export function employeeHours(shifts: Shift[], employeeId: string) {
 export function formatHours(hours: number) {
   return Number(hours.toFixed(2)).toString();
 }
-export function availabilityCovers(a: Availability, s: Shift) {
-  return availabilityWindows(s.employeeId, s.date, [a]).some(
+export function availabilityCovers(
+  a: Availability,
+  s: Shift,
+  hours: OperatingHours = BRANCH_OPERATING_HOURS,
+) {
+  return availabilityWindows(s.employeeId, s.date, [a], hours).some(
     (w) => w.branch === s.branch && w.start <= s.start && w.end >= s.end,
   );
 }
 export function availabilityStatus(
   a: Availability,
   shifts: Shift[],
+  hours: OperatingHours = BRANCH_OPERATING_HOURS,
 ): "Not Scheduled" | "Partially Scheduled" | "Scheduled" {
   const days = a.dates.map((date) => {
     const assigned = shifts.filter(
@@ -190,9 +215,10 @@ export function availabilityStatus(
     );
     return {
       full:
-        assigned.length > 0 && assigned.every((s) => availabilityCovers(a, s)),
+        assigned.length > 0 &&
+        assigned.every((s) => availabilityCovers(a, s, hours)),
       partial: assigned.some((s) =>
-        availabilityWindows(s.employeeId, s.date, [a]).some(
+        availabilityWindows(s.employeeId, s.date, [a], hours).some(
           (w) => w.branch === s.branch && s.start < w.end && w.start < s.end,
         ),
       ),
@@ -202,21 +228,26 @@ export function availabilityStatus(
   if (days.some((d) => d.partial)) return "Partially Scheduled";
   return "Not Scheduled";
 }
-export function availabilityWarning(s: Shift, availability: Availability[]) {
+export function availabilityWarning(
+  s: Shift,
+  availability: Availability[],
+  hours: OperatingHours = BRANCH_OPERATING_HOURS,
+) {
   const sameDay = availability.filter(
     (a) => a.employeeId === s.employeeId && a.dates.includes(s.date),
   );
   if (!sameDay.length)
     return "No availability submitted for this date. Confirm with the employee before saving.";
-  if (!sameDay.some((a) => availabilityCovers(a, s)))
+  if (!sameDay.some((a) => availabilityCovers(a, s, hours)))
     return "Outside submitted availability: check time range and acceptable branches before saving.";
   return null;
 }
 export function validateAvailabilitySubmission(
   a: Availability,
   records: Availability[],
+  team: Employee[] = employees,
 ) {
-  const error = validateAvailability(a);
+  const error = validateAvailability(a, team);
   if (error) return error;
   if (new Set(a.dates).size !== a.dates.length)
     return "Remove duplicate dates.";
@@ -272,8 +303,17 @@ export function validateHoliday(
   items: StatutoryHoliday[],
   shifts: Shift[],
   codes: readonly string[] = SH_CODES,
+  team: Employee[] = employees,
 ) {
-  if (!FULL_TIME_EMPLOYEE_IDS.includes(h.employeeId))
+  if (
+    !team.some(
+      (e) =>
+        e.id === h.employeeId &&
+        (e.employmentType
+          ? e.employmentType === "full-time"
+          : FULL_TIME_EMPLOYEE_IDS.includes(e.id)),
+    )
+  )
     return "Choose a full-time employee.";
   if (
     !validDate(h.date) ||
@@ -316,6 +356,7 @@ export function availabilityWindows(
   employeeId: string,
   date: string,
   records: Availability[],
+  hours: OperatingHours = BRANCH_OPERATING_HOURS,
 ): AvailabilityWindow[] {
   return records
     .filter((a) => a.employeeId === employeeId && a.dates.includes(date))
@@ -323,9 +364,7 @@ export function availabilityWindows(
       a.branches.map((branch) => ({
         availabilityId: a.id,
         branch,
-        ...(a.allDay
-          ? BRANCH_OPERATING_HOURS[branch]
-          : { start: a.start, end: a.end }),
+        ...(a.allDay ? hours[branch] : { start: a.start, end: a.end }),
       })),
     )
     .filter((w) => validTime(w.start) && validTime(w.end) && w.start < w.end);
@@ -335,10 +374,17 @@ export function validateScheduledShift(
   shifts: Shift[],
   availability: Availability[],
   holidays: StatutoryHoliday[] = [],
+  team: Employee[] = employees,
+  hours: OperatingHours = BRANCH_OPERATING_HOURS,
 ): string | null {
-  const issue = validateShift(s, shifts, holidays);
+  const issue = validateShift(s, shifts, holidays, team);
   if (issue) return issue;
-  const windows = availabilityWindows(s.employeeId, s.date, availability);
+  const windows = availabilityWindows(
+    s.employeeId,
+    s.date,
+    availability,
+    hours,
+  );
   if (!windows.length)
     return "No submitted availability for this employee and date. Submit availability first.";
   if (!windows.some((w) => w.branch === s.branch))
@@ -354,6 +400,9 @@ export function validateScheduledShift(
 export function planMonthlyPublication(
   data: DemoData,
   month: string,
+  team: Employee[] = employees,
+  hours: OperatingHours = BRANCH_OPERATING_HOURS,
+  codes: readonly string[] = SH_CODES,
 ): { errors: string[]; count: number; data: DemoData } {
   const shifts = data.shifts.filter(
     (s) => s.status === "draft" && s.date.startsWith(month),
@@ -368,13 +417,21 @@ export function planMonthlyPublication(
         data.shifts,
         data.availability,
         data.shItems,
+        team,
+        hours,
       );
       return error
-        ? `${employees.find((e) => e.id === s.employeeId)?.name ?? s.employeeId} · ${s.date} · ${s.branch} ${s.start}–${s.end}: ${error}`
+        ? `${team.find((e) => e.id === s.employeeId)?.name ?? s.employeeId} · ${s.date} · ${s.branch} ${s.start}–${s.end}: ${error}`
         : null;
     }),
     ...holidays.map((h) => {
-      const error = validateHoliday(h, data.shItems ?? [], data.shifts);
+      const error = validateHoliday(
+        h,
+        data.shItems ?? [],
+        data.shifts,
+        codes,
+        team,
+      );
       return error ? `${h.employeeId} · ${h.date} · ${h.code}: ${error}` : null;
     }),
   ].filter((e): e is string => !!e);

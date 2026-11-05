@@ -2,11 +2,11 @@
 
 SOS 係一個適合手機使用嘅咖啡店排更 prototype。介面使用 English，支援 **ST、CSW、SOHO W** 三間分店，同六位虛構員工。
 
-**呢個版本只係示範：冇真正登入、冇雲端同步、冇資料庫，唔好輸入真實員工資料。** Staff Demo／Manager Demo 只係介面模擬，唔係權限或資料安全措施。
+**`/` 保留獨立 localStorage demo；V5 新增 `/login` 同 `/team` Supabase 共享 workspace。** 未設定 Supabase 時 demo 仍然可用。正式 workspace 必須先執行 SQL migrations（含最少 SQL GRANT 同 RLS），再設定公開連線變數及已批准帳戶。暫時只用虛構測試資料。
 
 ## 開始使用（GitHub Codespaces）
 
-1. 喺 GitHub 開啟呢個 repository，揀包含 SOS prototype 嘅 branch（例如 `feat/sos-v4`）。
+1. 喺 GitHub 開啟呢個 repository，揀包含 SOS prototype 嘅 branch（例如 `feat/sos-v5`）。
 2. 按 **Code → Codespaces → Create codespace on [branch]**。
 3. 等 VS Code 開好，喺上方選單按 **Terminal → New Terminal**。
 4. 確認 terminal 已喺 repository 根目錄（見到 `package.json`），逐行輸入：
@@ -22,7 +22,7 @@ npm run dev
 5. 喺 **Ports** 面板搵到 `3000`，保持 **Private**，按 **Open in Browser**。如果冇自動顯示，按 **Add Port**，輸入 `3000`。
 6. 要停止 app，返 terminal 按 **Ctrl+C**。
 
-唔需要 `.env`、API key、Supabase account 或其他 service。唔需要部署。Codespaces 嘅 private forwarded port 係開發預覽，請唔好改成 public。
+只試 `/` demo 唔需要 `.env`、API key 或 Supabase。V5 共享模式設定見下面 Version 5 說明，唔需要公開部署。Codespaces 嘅 private forwarded port 係開發預覽，請唔好改成 public。
 
 ## 喺自己電腦啟動
 
@@ -31,7 +31,7 @@ npm run dev
 ```bash
 git clone https://github.com/kyb723/SOS.git
 cd SOS
-git switch feat/sos-v4
+git switch feat/sos-v5
 npm install
 npm run dev
 ```
@@ -81,7 +81,7 @@ npm start
 ```
 
 - `lint`：檢查常見程式錯誤。
-- `test`：48 個 unit tests，涵蓋跨分店重疊、相連班次、修改、不同員工／日期、錯誤時間／日期、sample data 同 availability validation。
+- `test`：60 個 unit tests，涵蓋跨分店重疊、相連班次、修改、不同員工／日期、錯誤時間／日期、sample data 同 availability validation。
 - `build`：TypeScript 檢查同 production build。
 - `start`：先完成 build，然後啟動 production server。請先停止 `dev`，避免用緊同一個 port。
 - 有 lockfile 後，重現同一版本可用 `npm ci` 代替 `npm install`。
@@ -134,3 +134,11 @@ Availability 已改成直接點選多日嘅月曆，手機 rota 改為七日顯�
 ## Version 4 更新
 
 主頁集中 rota，availability history 移到 Availability 管理視窗。Manager 可以直接由 Av 格建立工作更，新增／編輯／發佈都必須符合提交嘅分店同單一時間段。All-day 依照明確 prototype branch hours。手機格仔直接顯示時間，SH 按鈕移到頂部同一操作列，圖例最後只顯示 SH。全月 Publish Rota 有確認、跨全部分店驗證，以及 localStorage 儲存失敗保護。舊 invalid 更會保留並標示，唔會靜默刪除。詳細操作、規則、48 tests 同 iPhone 預覽方式見 [Version 4 說明](docs/VERSION_4.md)。
+
+## Version 5：共享資料庫同真正登入
+
+先閱讀 [Version 5 設定及權限說明](docs/VERSION_5.md)，依序執行兩份 `supabase/migrations` SQL，再配置 `.env.local` 同邀請測試帳戶。Automatic table exposure 可以維持關閉，automatic RLS 可以維持開啟；migration 明確加入 table／column GRANT 同 organisation／role／ownership policies，唔會停用 RLS。
+
+共享模式所有 staff 可睇同組織同事嘅 availability，只有 owner 可修改（經理亦不可代改）。Staff 只見 published rota；manager scheduling／monthly publish 經 trusted server 同 DB 驗證。資料寫 PostgreSQL，Synchronise／refresh 取得最新資料；冇自動匯入 demo。
+
+`npm test` 跑 60 個 unit／component tests；`npm run test:db` 跑隔離 PostgreSQL migration／GRANT／RLS／RPC tests；`npm run test:browser` 包括既有 mobile demo workflow 同未登入 route guards。本次未連接你嘅 Supabase 項目，真實登入、邀請 email 同三帳戶跨裝置同步仍需要完成設定後驗收。

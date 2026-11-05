@@ -3,13 +3,16 @@ import { useEffect, useRef, useState } from "react";
 import {
   BRANCHES,
   Branch,
-  employees,
+  employees as demoEmployees,
+  Employee,
   Shift,
   StatutoryHoliday,
   validateHoliday,
 } from "@/lib/scheduling";
 import { SH_CODES, FULL_TIME_EMPLOYEE_IDS } from "@/lib/rota-config";
 export default function HolidayEditor({
+  team = demoEmployees,
+  codes = SH_CODES,
   item,
   items,
   shifts,
@@ -17,6 +20,8 @@ export default function HolidayEditor({
   onDelete,
   onClose,
 }: {
+  codes?: readonly string[];
+  team?: Employee[];
   item: StatutoryHoliday;
   items: StatutoryHoliday[];
   shifts: Shift[];
@@ -24,6 +29,7 @@ export default function HolidayEditor({
   onDelete: (id: string) => void;
   onClose: () => void;
 }) {
+  const employees = team;
   const [value, setValue] = useState(item);
   const [error, setError] = useState("");
   const ref = useRef<HTMLDialogElement>(null);
@@ -61,7 +67,7 @@ export default function HolidayEditor({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const issue = validateHoliday(value, items, shifts);
+          const issue = validateHoliday(value, items, shifts, codes, team);
           if (issue) {
             setError(issue);
             return;
@@ -77,7 +83,11 @@ export default function HolidayEditor({
             onChange={(e) => setValue({ ...value, employeeId: e.target.value })}
           >
             {employees
-              .filter((e) => FULL_TIME_EMPLOYEE_IDS.includes(e.id))
+              .filter((e) =>
+                e.employmentType
+                  ? e.employmentType === "full-time"
+                  : FULL_TIME_EMPLOYEE_IDS.includes(e.id),
+              )
               .map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.name}
@@ -102,7 +112,7 @@ export default function HolidayEditor({
               value={value.code}
               onChange={(e) => setValue({ ...value, code: e.target.value })}
             >
-              {SH_CODES.map((c) => (
+              {codes.map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </select>
