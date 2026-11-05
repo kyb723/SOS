@@ -1,11 +1,14 @@
 import "server-only";
-import { publicSupabaseConfig } from "./config";
+import { publicSupabaseConfig, sharedWorkspaceEnabled } from "./config";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 export function supabaseConfigured() {
-  return !!(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  return (
+    sharedWorkspaceEnabled(process.env.SOS_SHARED_ENABLED) &&
+    !!(
+      process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+    )
   );
 }
 export async function createClient() {

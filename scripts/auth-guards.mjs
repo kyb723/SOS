@@ -44,7 +44,7 @@ try {
   assert.match(new URL(page.url()).pathname, /login/);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: anonymous team/account redirects, no unauthenticated schedule data, cross-origin writes denied, invite redirect cannot escape to an arbitrary origin. Actual sign-in/invite flows remain unrun without a Supabase project.",
+    "PASS: anonymous team/account redirects, no unauthenticated schedule data, cross-origin writes denied, invite redirect cannot escape to an arbitrary origin. Actual sign-in/invite flows were not run against the remote project.",
   );
 } finally {
   await browser.close();

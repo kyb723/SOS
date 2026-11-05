@@ -124,6 +124,8 @@ where user_id = 'AUTH_UUID_TO_DEACTIVATE'::uuid;
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLIC_PUBLISHABLE_KEY
+# Keep false until approved migrations and account setup are complete.
+SOS_SHARED_ENABLED=false
 SOS_APP_ORIGIN=https://YOUR-CODESPACE-3000.app.github.dev
 ```
 
@@ -140,7 +142,7 @@ npm install
 npm run dev
 ```
 
-環境變數改完要重啟 server。正式 workspace 開 `/login`，接受邀請並設定 password 後登入，再進 `/team`。原本 `/` demo 可照用。未設定 Supabase 時，login 會顯示 setup 提示，team 會導去 login，唔會偽裝成連線成功或自動 fallback 成共享 demo。
+先按 [開發項目設定及 migration review](SUPABASE_DEV_SETUP.md) 完成 SQL 審批／套用及帳戶 setup，再設定 `SOS_SHARED_ENABLED=true`。環境變數改完要重啟 server。正式 workspace 開 `/login`，接受邀請並設定 password 後登入，再進 `/team`。原本 `/` demo 可照用。未設定 Supabase 時，login 會顯示 setup 提示，team 會導去 login，唔會偽裝成連線成功或自動 fallback 成共享 demo。
 
 ## 6. 同一經理 + 兩位 staff 點樣測
 
@@ -161,7 +163,7 @@ npm run dev
 
 ## 7. 已驗證同未驗證
 
-- `npm run lint` 同 production build 通過；`npm test` 60 tests passed。
+- `npm run lint` 同 production build 通過；`npm test` 61 tests passed。
 - `npm run test:db` 42 checks passed，使用 **PGlite PostgreSQL** 真正執行兩份 migration、roles、GRANT、RLS、PL/pgSQL triggers／RPC。以一個 Manager、兩個 Staff、第二個 org、匿名及未批准身份檢查；唔係只比較 SQL 文字。
 - Auth user UUID／auth.uid() 喺隔離 DB 係測試 stub；**唔等同 Supabase JWT、email delivery、真實 Auth service 或跨連線 concurrency 測試**。
 - SQL tests 包括 team read、own-only availability（經理也不可代改）、role escalation denied、draft visibility、跨 org 隔離、no-GRANT permission denied／補回最小 grant 後成功、submitted_at 不可偽造、child UPDATE 不需要亦唔授權、DB overlap／SH、availability integrity、revision conflict、整批 rollback、原子發佈。

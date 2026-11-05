@@ -16,7 +16,8 @@ export default async function Login({
       <p>Invitation-only café workspace. Your demo remains separate.</p>
       {!supabaseConfigured() ? (
         <p role="status">
-          The shared workspace is not configured yet. Follow docs/VERSION_5.md.{" "}
+          The shared workspace is disabled or not configured. Complete approved
+          database setup before enabling it. Follow docs/VERSION_5.md.{" "}
           <Link href="/">Open local demo</Link>
         </p>
       ) : (

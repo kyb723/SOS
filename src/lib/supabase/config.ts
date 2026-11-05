@@ -27,3 +27,7 @@ export function publicSupabaseConfig(
     );
   return { url: parsed.origin, key };
 }
+
+export function sharedWorkspaceEnabled(value: string | undefined) {
+  return value === "true";
+}

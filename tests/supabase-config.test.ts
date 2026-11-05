@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { publicSupabaseConfig } from "../src/lib/supabase/config";
+import {
+  publicSupabaseConfig,
+  sharedWorkspaceEnabled,
+} from "../src/lib/supabase/config";
 describe("public Supabase configuration", () => {
   it("accepts a publishable key over HTTPS", () =>
     expect(
@@ -26,5 +29,13 @@ describe("public Supabase configuration", () => {
     expect(() =>
       publicSupabaseConfig("http://test.supabase.co", "public-test"),
     ).toThrow(/HTTPS/);
+  });
+});
+
+describe("shared workspace activation", () => {
+  it("requires explicit activation after database setup", () => {
+    for (const value of [undefined, "false", "TRUE", "1", ""])
+      expect(sharedWorkspaceEnabled(value)).toBe(false);
+    expect(sharedWorkspaceEnabled("true")).toBe(true);
   });
 });

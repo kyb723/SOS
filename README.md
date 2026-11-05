@@ -81,7 +81,7 @@ npm start
 ```
 
 - `lint`：檢查常見程式錯誤。
-- `test`：60 個 unit tests，涵蓋跨分店重疊、相連班次、修改、不同員工／日期、錯誤時間／日期、sample data 同 availability validation。
+- `test`：61 個 unit tests，涵蓋跨分店重疊、相連班次、修改、不同員工／日期、錯誤時間／日期、sample data 同 availability validation。
 - `build`：TypeScript 檢查同 production build。
 - `start`：先完成 build，然後啟動 production server。請先停止 `dev`，避免用緊同一個 port。
 - 有 lockfile 後，重現同一版本可用 `npm ci` 代替 `npm install`。
@@ -141,4 +141,8 @@ Availability 已改成直接點選多日嘅月曆，手機 rota 改為七日顯�
 
 共享模式所有 staff 可睇同組織同事嘅 availability，只有 owner 可修改（經理亦不可代改）。Staff 只見 published rota；manager scheduling／monthly publish 經 trusted server 同 DB 驗證。資料寫 PostgreSQL，Synchronise／refresh 取得最新資料；冇自動匯入 demo。
 
-`npm test` 跑 60 個 unit／component tests；`npm run test:db` 跑隔離 PostgreSQL migration／GRANT／RLS／RPC tests；`npm run test:browser` 包括既有 mobile demo workflow 同未登入 route guards。本次未連接你嘅 Supabase 項目，真實登入、邀請 email 同三帳戶跨裝置同步仍需要完成設定後驗收。
+`npm test` 跑 61 個 unit／component tests；`npm run test:db` 跑隔離 PostgreSQL migration／GRANT／RLS／RPC tests；`npm run test:browser` 包括既有 mobile demo workflow 同未登入 route guards。本次未連接你嘅 Supabase 項目，真實登入、邀請 email 同三帳戶跨裝置同步仍需要完成設定後驗收。
+
+## Supabase 開發項目設定
+
+已加入預設關閉嘅 `SOS_SHARED_ENABLED=false`，避免 migration 未批准／套用就啟用共享模式。現有 demo data 保留。Codespaces 必須自行建立被忽略嘅 `.env.local`，先填公開 URL／publishable key，完成 SQL 及帳戶 setup 後先改成 true 並重啟 server。完整時間順序同 migration review 見 [sos-rota-dev 設定](docs/SUPABASE_DEV_SETUP.md)。

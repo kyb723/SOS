@@ -1,9 +1,13 @@
-import { publicSupabaseConfig } from "@/lib/supabase/config";
+import {
+  publicSupabaseConfig,
+  sharedWorkspaceEnabled,
+} from "@/lib/supabase/config";
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   if (
+    !sharedWorkspaceEnabled(process.env.SOS_SHARED_ENABLED) ||
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
     !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
   )
